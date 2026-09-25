@@ -3,6 +3,17 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Uploaded pictures (created at runtime)
+static/uploads/
+
+# IDEs / editors
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
+
 # C extensions
 *.so
 

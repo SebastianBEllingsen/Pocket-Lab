@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>PocketLab - Blood Cell Image Editor</title>
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='style.css') }}"
+>
+
+</head>
+
+<body>
+
+<header class="topbar">
+
+<div class="logo">
+    <span class="logo-icon">🔬</span>
+
+    <div>
+        <h1>PocketLab</h1>
+        <p>Blood Cell Image Editor</p>
+    </div>
+</div>
+
+<div class="top-actions">
+
+    <button onclick="sendAction('/undo')">
+        ↶
+        <span>Undo</span>
+    </button>
+
+    <button onclick="sendAction('/redo')">
+        ↷
+        <span>Redo</span>
+    </button>
+
+</div>
+
+
+</header>
+
+<main class="app-container">
+
+
+<!-- TOOLBAR -->
+
+<section class="toolbar">
+
+    <!-- FILE -->
+
+    <div class="tool-group">
+
+        <h3>File</h3>
+
+        <!-- Hidden file input -->
+        <input
+            type="file"
+            id="imageInput"
+            accept="image/*"
+            hidden
+        >
+
+        <button onclick="openImage()">
+            📂 Open Image
+        </button>
+
+        <button onclick="sendAction('/save-image')">
+            💾 Save
+        </button>
+
+        <button onclick="sendAction('/reset')">
+            🔄 Reset
+        </button>
+
+    </div>
+
+
+    <!-- TOOLS -->
+
+    <div class="tool-group">
+
+        <h3>Tools</h3>
+
+        <button onclick="sendAction('/rectangle')">
+            ▭ Rectangle
+        </button>
+
+        <button onclick="sendAction('/contour')">
+            ✎ Freehand
+        </button>
+
+        <button onclick="sendAction('/crop')">
+            ✂ Crop
+        </button>
+
+        <button onclick="sendAction('/text')">
+            T Text
+        </button>
+
+    </div>
+
+
+    <!-- ZOOM -->
+
+    <div class="tool-group">
+
+        <h3>Zoom</h3>
+
+        <button onclick="sendAction('/zoom-in')">
+            🔍+
+        </button>
+
+        <button onclick="sendAction('/zoom-out')">
+            🔍−
+        </button>
+
+    </div>
+
+
+    <!-- ADJUSTMENTS -->
+
+    <div class="tool-group">
+
+        <h3>Adjustments</h3>
+
+        <button onclick="sendAction('/greyscale')">
+            Greyscale
+        </button>
+
+    </div>
+
+</section>
+
+
+<!-- MAIN WORKSPACE -->
+
+<section class="workspace">
+
+    <!-- IMAGE EDITOR -->
+
+    <div class="editor-panel">
+
+        <div class="panel-header">
+
+            <span>Image Editor</span>
+
+            <span id="image-status">
+                No image loaded
+            </span>
+
+        </div>
+
+
+        <!-- IMAGE AREA -->
+
+        <div class="canvas-container">
+
+            <!-- Shown before an image is selected -->
+
+            <div
+                class="placeholder-image"
+                id="imagePlaceholder"
+            >
+
+                <div class="microscope-icon">
+                    🔬
+                </div>
+
+                <h2>
+                    Open a microscope image
+                </h2>
+
+                <p>
+                    Your blood-cell image will appear here.
+                </p>
+
+                <button
+                    class="primary-button"
+                    onclick="openImage()"
+                >
+                    📂 Open Image
+                </button>
+
+            </div>
+
+
+            <!-- Selected image -->
+
+            <img
+                id="editorImage"
+                class="editor-image"
+                alt="Selected microscope image"
+                style="display: none;"
+            >
+
+
+
+        </div>
+
+
+        <!-- BOTTOM TOOLBAR -->
+
+        <div class="bottom-toolbar">
+
+            <button onclick="sendAction('/zoom-out')">
+                −
+            </button>
+
+            <span id="zoom-level">
+                100%
+            </span>
+
+            <button onclick="sendAction('/zoom-in')">
+                +
+            </button>
+
+            <div class="separator"></div>
+
+            <button onclick="sendAction('/undo')">
+                ↶ Undo
+            </button>
+
+            <button onclick="sendAction('/redo')">
+                ↷ Redo
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- CELL ANALYSIS -->
+
+    <aside class="analysis-panel">
+
+        <div class="panel-header">
+            Cell Analysis
+        </div>
+
+
+        <div class="analysis-content">
+
+            <!-- COUNTING -->
+
+            <h3>
+                Counting
+            </h3>
+
+            <button
+                class="analysis-button red-button"
+                onclick="countCells('/count-red', 'red-count')"
+            >
+                🔴 Count Red Cells
+            </button>
+
+            <button
+                class="analysis-button white-button"
+                onclick="countCells('/count-white', 'white-count')"
+            >
+                ⚪ Count White Cells
+            </button>
+
+
+            <div class="count-card">
+
+                <div>
+                    <span>
+                        Red Blood Cells
+                    </span>
+
+                    <strong id="red-count">
+                        --
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        White Blood Cells
+                    </span>
+
+                    <strong id="white-count">
+                        --
+                    </strong>
+                </div>
+
+            </div>
+
+
+            <!-- CELL DISPLAY -->
+
+            <h3>
+                Cell Display
+            </h3>
+
+            <button
+                class="analysis-button"
+                onclick="sendAction('/show-red')"
+            >
+                🔴 Show Red Cells
+            </button>
+
+            <button
+                class="analysis-button"
+                onclick="sendAction('/show-white')"
+            >
+                ⚪ Show White Cells
+            </button>
+
+            <button
+                class="analysis-button"
+                onclick="sendAction('/show-all')"
+            >
+                🔬 Show All Cells
+            </button>
+
+
+            <!-- RESULTS -->
+
+            <div class="result-box">
+
+                <h3>
+                    Analysis Results
+                </h3>
+
+                <p>
+                    Image analysis results will appear here.
+                </p>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+</section>
+
+</main>
+
+<!-- MOBILE BOTTOM NAVIGATION -->
+
+<nav class="mobile-nav">
+
+
+<button onclick="openImage()">
+    📂
+    <span>
+        Open
+    </span>
+</button>
+
+<button onclick="sendAction('/zoom-in')">
+    🔍
+    <span>
+        Zoom
+    </span>
+</button>
+
+<button onclick="sendAction('/greyscale')">
+    ◐
+    <span>
+        Adjust
+    </span>
+</button>
+
+<button onclick="countCells('/count-red', 'red-count')">
+    🔴
+    <span>
+        Count
+    </span>
+</button>
+
+<button onclick="sendAction('/reset')">
+    🔄
+    <span>
+        Reset
+    </span>
+</button>
+</nav>
+
+<!-- NOTIFICATIONS -->
+
+<div id="notification"></div>
+
+<!-- JAVASCRIPT -->
+
+<script
+    src="{{ url_for('static', filename='app.js') }}"
+></script>
+
+</body>
+
+</html>
