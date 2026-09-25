@@ -5,6 +5,7 @@ __pycache__/
 
 #pictures folder
 .idea
+uploads
 
 # C extensions
 *.so
