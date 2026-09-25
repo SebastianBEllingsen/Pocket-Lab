@@ -145,10 +145,10 @@ if (data.success) {
     ).style.display = "none";
 
 
-    // Show the button for changing the image
+    // Reset zoom display for the new image
     document.getElementById(
-        "changeImageButton"
-    ).style.display = "block";
+        "zoom-level"
+    ).textContent = "100%";
 
 
     // Update image name

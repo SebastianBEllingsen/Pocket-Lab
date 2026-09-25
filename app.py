@@ -1,11 +1,13 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, url_for
+from werkzeug.utils import secure_filename
 import cv2
 import os
 
 app = Flask(__name__)
 
-# Folder where uploaded images will be saved
-UPLOAD_FOLDER = "static/uploads"
+# Folder where uploaded images will be saved (absolute, so the app
+# works no matter which directory it is started from)
+UPLOAD_FOLDER = os.path.join(app.static_folder, "uploads")
 
 # Create the folder if it does not exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -45,8 +47,16 @@ def open_image():
             "message": "No image selected"
         })
 
-    # Save the uploaded image
-    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    # Save the uploaded image (secure_filename blocks paths like "../../x")
+    filename = secure_filename(file.filename)
+
+    if filename == "":
+        return jsonify({
+            "success": False,
+            "message": "Invalid file name"
+        })
+
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
 
     # Read the image with OpenCV
@@ -59,6 +69,9 @@ def open_image():
             "message": "Could not read image with OpenCV"
         })
 
+    # New image starts at 100% zoom
+    zoom_level = 1.0
+
     # Print information about the image
     print("Image opened successfully!")
     print("Image shape:", current_image.shape)
@@ -67,7 +80,7 @@ def open_image():
     return jsonify({
         "success": True,
         "message": "Image opened successfully",
-        "image_url": "/" + filepath.replace("\\", "/")
+        "image_url": url_for("static", filename="uploads/" + filename)
     })
 
 
@@ -141,11 +154,10 @@ def save_zoomed_image(image):
 
     cv2.imwrite(zoomed_path, image)
 
-    return "/" + zoomed_path.replace("\\", "/")
+    return url_for("static", filename="uploads/zoomed_image.jpg")
 
 
 @app.route("/zoom-in", methods=["POST"])
-
 def zoom_in():
     global current_image, zoom_level
 

@@ -199,7 +199,8 @@
             <img
                 id="editorImage"
                 class="editor-image"
-
+                alt="Selected microscope image"
+                style="display: none;"
             >
 
 
@@ -371,7 +372,7 @@
     </span>
 </button>
 
-<button onclick="sendAction('/count-red')">
+<button onclick="countCells('/count-red', 'red-count')">
     🔴
     <span>
         Count
