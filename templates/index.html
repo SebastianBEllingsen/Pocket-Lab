@@ -32,19 +32,7 @@
     </div>
 </div>
 
-<div class="top-actions">
 
-    <button onclick="sendAction('/undo')">
-        ↶
-        <span>Undo</span>
-    </button>
-
-    <button onclick="sendAction('/redo')">
-        ↷
-        <span>Redo</span>
-    </button>
-
-</div>
 
 
 </header>
@@ -78,9 +66,7 @@
             💾 Save
         </button>
 
-        <button onclick="sendAction('/reset')">
-            🔄 Reset
-        </button>
+
 
     </div>
 
@@ -91,13 +77,6 @@
 
         <h3>Tools</h3>
 
-        <button onclick="sendAction('/rectangle')">
-            ▭ Rectangle
-        </button>
-
-        <button onclick="sendAction('/contour')">
-            ✎ Freehand
-        </button>
 
         <button onclick="sendAction('/crop')">
             ✂ Crop
@@ -106,6 +85,43 @@
         <button onclick="sendAction('/text')">
             T Text
         </button>
+
+        <button onclick="sendAction('/contour')">
+            ✎ Draw
+        </button>
+
+         <!-- Shapes dropdown -->
+
+    <div class="dropdown">
+
+        <button
+            class="dropdown-button"
+            onclick="toggleShapes()"
+        >
+            Shapes
+            <span>▼</span>
+        </button>
+
+        <div
+            id="shapesMenu"
+            class="dropdown-menu"
+        >
+
+            <button onclick="sendAction('/arrow')">
+                Arrow
+            </button>
+
+            <button onclick="sendAction('/circle')">
+                Circle
+            </button>
+
+            <button onclick="sendAction('/rectangle')">
+                Rectangle
+            </button>
+
+        </div>
+
+    </div>
 
     </div>
 
@@ -127,17 +143,6 @@
     </div>
 
 
-    <!-- ADJUSTMENTS -->
-
-    <div class="tool-group">
-
-        <h3>Adjustments</h3>
-
-        <button onclick="sendAction('/greyscale')">
-            Greyscale
-        </button>
-
-    </div>
 
 </section>
 
@@ -184,12 +189,7 @@
                     Your blood-cell image will appear here.
                 </p>
 
-                <button
-                    class="primary-button"
-                    onclick="openImage()"
-                >
-                    📂 Open Image
-                </button>
+
 
             </div>
 
@@ -212,19 +212,7 @@
 
         <div class="bottom-toolbar">
 
-            <button onclick="sendAction('/zoom-out')">
-                −
-            </button>
 
-            <span id="zoom-level">
-                100%
-            </span>
-
-            <button onclick="sendAction('/zoom-in')">
-                +
-            </button>
-
-            <div class="separator"></div>
 
             <button onclick="sendAction('/undo')">
                 ↶ Undo
@@ -350,46 +338,42 @@
 
 <nav class="mobile-nav">
 
+    <button onclick="openImage()">
+        📂
+        <span>
+            Open
+        </span>
+    </button>
 
-<button onclick="openImage()">
-    📂
-    <span>
-        Open
-    </span>
-</button>
 
-<button onclick="sendAction('/zoom-in')">
-    🔍
-    <span>
-        Zoom
-    </span>
-</button>
+    <button onclick="sendAction('/zoom-in')">
+        🔍
+        <span>
+            Zoom
+        </span>
+    </button>
 
-<button onclick="sendAction('/greyscale')">
-    ◐
-    <span>
-        Adjust
-    </span>
-</button>
 
-<button onclick="countCells('/count-red', 'red-count')">
-    🔴
-    <span>
-        Count
-    </span>
-</button>
+    <!-- Tools -->
 
-<button onclick="sendAction('/reset')">
-    🔄
-    <span>
-        Reset
-    </span>
-</button>
+    <div class="mobile-tools">
+
+        <button onclick="toggleMobileTools()">
+            🧷
+            <span>
+                Tools
+            </span>
+        </button>
+
+    </div>
+
 </nav>
+
 
 <!-- NOTIFICATIONS -->
 
 <div id="notification"></div>
+
 
 <!-- JAVASCRIPT -->
 

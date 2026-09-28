@@ -167,3 +167,11 @@ if (data.success) {
         }
     };
 }
+
+function toggleShapes() {
+
+    const menu = document.getElementById("shapesMenu");
+
+    menu.classList.toggle("show");
+}
+

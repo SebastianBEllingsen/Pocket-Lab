@@ -100,7 +100,7 @@ button:active {
 
 .toolbar {
     display: flex;
-    gap: 12px;
+    gap: 20px;
 
     background: #151936;
     border: 1px solid #292e55;
@@ -111,20 +111,26 @@ button:active {
 
     margin-bottom: 20px;
 
-    overflow-x: auto;
+    overflow: visible;
+
+    position: relative;
 }
 
 
 .tool-group {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 15px;
 
     padding-right: 15px;
 
     border-right: 1px solid #30355d;
 
     white-space: nowrap;
+
+    position: relative;
+
+    overflow: visible;
 }
 
 
@@ -134,9 +140,94 @@ button:active {
 
 
 .tool-group h3 {
-    font-size: 12px;
+    font-size: 15px;
     color: #8f96bd;
     margin-right: 5px;
+}
+
+/* -------------------------
+   SHAPES DROPDOWN
+------------------------- */
+
+.dropdown {
+    position: relative;
+
+    display: inline-block;
+}
+
+
+.dropdown-button {
+    min-width: 70px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+}
+
+
+.dropdown-button span {
+    font-size: 10px;
+
+    color: #9ca3c7;
+}
+
+
+.dropdown-menu {
+    display: none;
+
+    position: absolute;
+
+    top: calc(100% + 6px);
+
+    left: 0;
+
+    min-width: 100px;
+
+    background: #1a1f41;
+
+    border: 1px solid #363c68;
+
+    border-radius: 10px;
+
+    padding: 6px;
+
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.35);
+
+    z-index: 9999;
+}
+
+
+.dropdown-menu.show {
+    display: block;
+}
+
+
+.dropdown-menu button {
+    display: block;
+
+    width: 100%;
+
+    padding: 10px 12px;
+
+    background: transparent;
+
+    color: white;
+
+    text-align: left;
+
+    border-radius: 7px;
+
+    font-size: 13px;
+}
+
+
+.dropdown-menu button:hover {
+    background: #30365f;
 }
 
 
