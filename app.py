@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, url_for
 from werkzeug.utils import secure_filename
+from cell_detection import detect_cells, draw_cells
 import cv2
 import os
 
@@ -146,15 +147,9 @@ def text():
 # ZOOM
 # -------------------------
 
-def save_zoomed_image(image):
-    zoomed_path = os.path.join(
-        UPLOAD_FOLDER,
-        "zoomed_image.jpg"
-    )
-
-    cv2.imwrite(zoomed_path, image)
-
-    return url_for("static", filename="uploads/zoomed_image.jpg")
+def save_result_image(image, filename):
+    cv2.imwrite(os.path.join(UPLOAD_FOLDER, filename), image)
+    return url_for("static", filename="uploads/" + filename)
 
 
 @app.route("/zoom-in", methods=["POST"])
@@ -185,8 +180,7 @@ def zoom_in():
     )
 
     # Save zoomed image
-    image_url = save_zoomed_image(zoomed_image)
-
+    image_url = save_result_image(zoomed_image, "zoomed_image.jpg")
     return jsonify({
         "success": True,
         "message": "Zoom in",
@@ -221,8 +215,7 @@ def zoom_out():
     )
 
     # Save zoomed image
-    image_url = save_zoomed_image(zoomed_image)
-
+    image_url = save_result_image(zoomed_image, "zoomed_image.jpg")
     return jsonify({
         "success": True,
         "message": "Zoom out",
@@ -274,60 +267,83 @@ def redo():
 
 @app.route("/count-red", methods=["POST"])
 def count_red():
-    # TODO:
-    # OpenCV segmentation + contour detection
-    # Count red blood cells
+    if current_image is None:
+        return jsonify({"success": False, "count": "--", "message": "No image loaded"})
+
+    rbc_contours, _ = detect_cells(current_image)
 
     return jsonify({
         "success": True,
-        "count": "--",
-        "message": "Red cell counting will be implemented with OpenCV"
+        "count": len(rbc_contours),
+        "message": f"Found {len(rbc_contours)} red blood cells"
     })
 
 
 @app.route("/count-white", methods=["POST"])
 def count_white():
-    # TODO:
-    # OpenCV segmentation + contour detection
-    # Count white blood cells
+    if current_image is None:
+        return jsonify({"success": False, "count": "--", "message": "No image loaded"})
+
+    _, wbc_contours = detect_cells(current_image)
 
     return jsonify({
         "success": True,
-        "count": "--",
-        "message": "White cell counting will be implemented with OpenCV"
+        "count": len(wbc_contours),
+        "message": f"Found {len(wbc_contours)} white blood cells"
     })
 
 
-# -------------------------
+# -------------------------¢
 # SHOW CELLS
 # -------------------------
 
 @app.route("/show-red", methods=["POST"])
 def show_red():
-    # TODO: OpenCV segmentation
+    if current_image is None:
+        return jsonify({"success": False, "message": "No image loaded"})
+
+    rbc_contours, wbc_contours = detect_cells(current_image)
+    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=True, show_white=False)
+    image_url = save_result_image(result, "cells_red.jpg")
+
     return jsonify({
         "success": True,
-        "message": "Show red cells - OpenCV code goes here"
+        "message": "Showing red blood cells",
+        "image_url": image_url
     })
 
 
 @app.route("/show-white", methods=["POST"])
 def show_white():
-    # TODO: OpenCV segmentation
+    if current_image is None:
+        return jsonify({"success": False, "message": "No image loaded"})
+
+    rbc_contours, wbc_contours = detect_cells(current_image)
+    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=False, show_white=True)
+    image_url = save_result_image(result, "cells_white.jpg")
+
     return jsonify({
         "success": True,
-        "message": "Show white cells - OpenCV code goes here"
+        "message": "Showing white blood cells",
+        "image_url": image_url
     })
 
 
 @app.route("/show-all", methods=["POST"])
 def show_all():
-    # TODO: Show all detected cells
+    if current_image is None:
+        return jsonify({"success": False, "message": "No image loaded"})
+
+    rbc_contours, wbc_contours = detect_cells(current_image)
+    result = draw_cells(current_image, rbc_contours, wbc_contours)
+    image_url = save_result_image(result, "cells_all.jpg")
+
     return jsonify({
         "success": True,
-        "message": "Show all cells - OpenCV code goes here"
+        "message": "Showing all cells",
+        "image_url": image_url
     })
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
