@@ -671,3 +671,72 @@ button:active {
         color: #9da4c5;
     }
 }
+
+/* -------------------------
+   MOBILE TOOLS
+------------------------- */
+
+.mobile-tools {
+    position: relative;
+}
+
+
+.mobile-tools-menu {
+    display: none;
+
+    position: absolute;
+    bottom: 70px;
+    right: 0;
+
+    background: #151936;
+    border: 1px solid #3a3f65;
+    border-radius: 12px;
+
+    padding: 8px;
+
+    width: 150px;
+
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+
+    z-index: 1000;
+}
+
+
+.mobile-tools-menu.show {
+    display: flex;
+    flex-direction: column;
+}
+
+
+.mobile-tools-menu button {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    width: 100%;
+
+    padding: 10px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: transparent;
+    color: white;
+
+    font-size: 14px;
+
+    text-align: left;
+
+    cursor: pointer;
+}
+
+
+.mobile-tools-menu button:hover {
+    background: #252a50;
+}
+
+
+.mobile-tools-menu button span {
+    flex: 1;
+}
