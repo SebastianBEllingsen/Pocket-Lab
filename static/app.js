@@ -175,3 +175,46 @@ function toggleShapes() {
     menu.classList.toggle("show");
 }
 
+function toggleMobileTools() {
+
+    const menu = document.getElementById("mobileToolsMenu");
+
+    menu.classList.toggle("show");
+
+}
+
+
+function selectTool(tool) {
+
+    console.log("Selected tool:", tool);
+
+    // Close the tools menu
+    document.getElementById("mobileToolsMenu")
+        .classList.remove("show");
+
+
+    if (tool === "crop") {
+        console.log("Crop selected");
+    }
+
+    else if (tool === "draw") {
+        console.log("Draw selected");
+    }
+
+    else if (tool === "text") {
+        console.log("Text Box selected");
+    }
+
+    else if (tool === "arrow") {
+        console.log("Arrow selected");
+    }
+
+    else if (tool === "rectangle") {
+        console.log("Rectangle selected");
+    }
+
+    else if (tool === "circle") {
+        console.log("Circle selected");
+    }
+
+}
