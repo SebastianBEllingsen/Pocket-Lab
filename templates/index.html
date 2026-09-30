@@ -132,11 +132,11 @@
 
         <h3>Zoom</h3>
 
-        <button onclick="sendAction('/zoom-in')">
+        <button onclick="activateZoomIn()">
             🔍+
         </button>
 
-        <button onclick="sendAction('/zoom-out')">
+        <button onclick="activateZoomIn()">
             🔍−
         </button>
 
@@ -210,19 +210,23 @@
 
         <!-- BOTTOM TOOLBAR -->
 
-        <div class="bottom-toolbar">
+<div class="bottom-toolbar">
 
 
 
-            <button onclick="sendAction('/undo')">
-                ↶ Undo
-            </button>
+    <span id="zoom-level">
 
-            <button onclick="sendAction('/redo')">
-                ↷ Redo
-            </button>
+    </span>
 
-        </div>
+    <button onclick="sendAction('/undo')">
+        ↶ Undo
+    </button>
+
+    <button onclick="sendAction('/redo')">
+        ↷ Redo
+    </button>
+
+</div>
 
     </div>
 
@@ -346,7 +350,7 @@
     </button>
 
 
-    <button onclick="sendAction('/zoom-in')">
+    <button onclick="activateZoomIn()">
         🔍
         <span>
             Zoom
@@ -413,9 +417,9 @@
 
 <!-- JAVASCRIPT -->
 
-<script
-    src="{{ url_for('static', filename='app.js') }}"
-></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='photo_editor/image.js') }}"></script>
+<script src="{{ url_for('static', filename='photo_editor/zoom.js') }}"></script>
 
 </body>
 

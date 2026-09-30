@@ -1,3 +1,4 @@
+
 // ------------------------------------
 // Send button action to Flask
 // ------------------------------------
@@ -99,74 +100,6 @@ function showNotification(message) {
 }
 
 
-async function openImage() {
-
-    const input = document.getElementById("imageInput");
-
-    // Åpne PC-filvelgeren
-    input.click();
-
-    // Vent til brukeren velger et bilde
-    input.onchange = async function () {
-
-        const file = input.files[0];
-
-        if (!file) {
-            return;
-        }
-
-        // Lag en FormData
-        const formData = new FormData();
-
-        formData.append("image", file);
-
-        // Send bildet til Flask
-        const response = await fetch("/open-image", {
-            method: "POST",
-            body: formData
-        });
-
-        const data = await response.json();
-
-if (data.success) {
-
-    // Get the image element
-    const image =
-        document.getElementById("editorImage");
-
-    // Show the selected image
-    image.src = data.image_url;
-    image.style.display = "block";
-
-
-    // Hide the microscope placeholder
-    document.getElementById(
-        "imagePlaceholder"
-    ).style.display = "none";
-
-
-    // Reset zoom display for the new image
-    document.getElementById(
-        "zoom-level"
-    ).textContent = "100%";
-
-
-    // Update image name
-    document.getElementById(
-        "image-status"
-    ).textContent = file.name;
-
-
-    showNotification(
-        "Image opened successfully"
-    );
-
-}else {
-
-            alert(data.message);
-        }
-    };
-}
 
 function toggleShapes() {
 
