@@ -1,13 +1,12 @@
 from flask import Flask, render_template, request, jsonify, url_for
-from werkzeug.utils import secure_filename
 from cell_detection import detect_cells, draw_cells
+from processing.zoom import zoom_in
+from processing.image import open_image
 import cv2
 import os
 
 app = Flask(__name__)
 
-# Folder where uploaded images will be saved (absolute, so the app
-# works no matter which directory it is started from)
 UPLOAD_FOLDER = os.path.join(app.static_folder, "uploads")
 
 # Create the folder if it does not exist
@@ -23,13 +22,8 @@ zoom_level = 1.0
 def index():
     return render_template("index.html")
 
-
-# -------------------------
-# FILE MENU
-# -------------------------
-
 @app.route("/open-image", methods=["POST"])
-def open_image():
+def open_image_route():
     global current_image, zoom_level
 
     # Check if an image was uploaded
@@ -41,49 +35,34 @@ def open_image():
 
     file = request.files["image"]
 
-    # Check if a file was selected
-    if file.filename == "":
+    # Open the image using the function from processing/image.py
+    image, filename, error = open_image(
+        file,
+        UPLOAD_FOLDER
+    )
+
+    # Check if opening the image failed
+    if error is not None:
         return jsonify({
             "success": False,
-            "message": "No image selected"
+            "message": error
         })
 
-    # Save the uploaded image (secure_filename blocks paths like "../../x")
-    filename = secure_filename(file.filename)
-
-    if filename == "":
-        return jsonify({
-            "success": False,
-            "message": "Invalid file name"
-        })
-
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
-
-    # Read the image with OpenCV
-    current_image = cv2.imread(filepath)
-
-    # Check if OpenCV could read the image
-    if current_image is None:
-        return jsonify({
-            "success": False,
-            "message": "Could not read image with OpenCV"
-        })
+    # Store the opened image
+    current_image = image
 
     # New image starts at 100% zoom
     zoom_level = 1.0
-
-    # Print information about the image
-    print("Image opened successfully!")
-    print("Image shape:", current_image.shape)
 
     # Send image location back to JavaScript
     return jsonify({
         "success": True,
         "message": "Image opened successfully",
-        "image_url": url_for("static", filename="uploads/" + filename)
+        "image_url": url_for(
+            "static",
+            filename="uploads/" + filename
+        )
     })
-
 
 @app.route("/save-image", methods=["POST"])
 def save_image():
@@ -143,9 +122,6 @@ def text():
     })
 
 
-# -------------------------
-# ZOOM
-# -------------------------
 
 def save_result_image(image, filename):
     cv2.imwrite(os.path.join(UPLOAD_FOLDER, filename), image)
@@ -153,8 +129,8 @@ def save_result_image(image, filename):
 
 
 @app.route("/zoom-in", methods=["POST"])
-def zoom_in():
-    global current_image, zoom_level
+def zoom_in_route():
+    global current_image
 
     if current_image is None:
         return jsonify({
@@ -162,29 +138,22 @@ def zoom_in():
             "message": "No image loaded"
         })
 
-    # Increase zoom level
-    zoom_level += 0.2
+    # Get click position from JavaScript
+    data = request.get_json()
 
-    # Get original image size
-    height, width = current_image.shape[:2]
+    x = int(data["x"])
+    y = int(data["y"])
 
-    # Calculate new size
-    new_width = int(width * zoom_level)
-    new_height = int(height * zoom_level)
+    print("Zoom point:", x, y)
 
-    # Resize image using OpenCV
-    zoomed_image = cv2.resize(
-        current_image,
-        (new_width, new_height),
-        interpolation=cv2.INTER_LINEAR
-    )
+    # Perform zoom using the function from zoom.py
+    zoomed_image = zoom_in(current_image, x, y)
 
     # Save zoomed image
     image_url = save_result_image(zoomed_image, "zoomed_image.jpg")
     return jsonify({
         "success": True,
         "message": "Zoom in",
-        "zoom": int(zoom_level * 100),
         "image_url": image_url
     })
 
