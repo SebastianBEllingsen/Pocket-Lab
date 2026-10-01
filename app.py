@@ -15,7 +15,33 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 current_image = None
 original_image = None
+
+# Stores all image versions
+image_history = []
+
+# Points to the currently selected image version
+current_index = -1
+
 zoom_level = 1.0
+
+# -------------------------
+# IMAGE HISTORY
+# -------------------------
+
+def add_to_history(image):
+    global image_history, current_index
+
+    # Remove redo history
+    image_history = image_history[:current_index + 1]
+
+    # Store a copy of the image
+    image_history.append(image.copy())
+
+    # Move to the newest image
+    current_index = len(image_history) - 1
+
+    print("History length:", len(image_history))
+    print("Current index:", current_index)
 
 # -------------------------
 # Main page
@@ -26,7 +52,7 @@ def index():
 
 @app.route("/open-image", methods=["POST"])
 def open_image_route():
-    global current_image, original_image, zoom_level
+    global current_image, original_image, image_history, current_index, zoom_level
 
     # Check if an image was uploaded
     if "image" not in request.files:
@@ -53,6 +79,10 @@ def open_image_route():
     # Store the opened image
     current_image = image
     original_image = current_image.copy()
+
+    # Start a new image history
+    image_history = [image.copy()]
+    current_index = 0
 
     # New image starts at 100% zoom
     zoom_level = 1.0
@@ -131,13 +161,20 @@ def crop():
     print("width:", width)
     print("height:", height)
 
-    current_image = crop_image(
+    # Create the cropped image
+    cropped_image = crop_image(
         current_image,
         x,
         y,
         width,
         height
     )
+
+    # Add the cropped image to history
+    add_to_history(cropped_image)
+
+    # Make the cropped image the current image
+    current_image = cropped_image
 
     filename = "cropped_image.jpg"
 
@@ -189,6 +226,12 @@ def zoom_in_route():
     # Perform zoom using the function from zoom.py
     zoomed_image = zoom_in(current_image, x, y)
 
+    # Add the new zoomed image to history
+    add_to_history(zoomed_image)
+
+    # Make the zoomed image the new current image
+    current_image = zoomed_image
+
     # Save zoomed image
     image_url = save_result_image(zoomed_image, "zoomed_image.jpg")
     return jsonify({
@@ -233,19 +276,6 @@ def zoom_out():
     })
 
 
-# -------------------------
-# ADJUSTMENTS
-# -------------------------
-
-@app.route("/greyscale", methods=["POST"])
-def greyscale():
-    # TODO:
-    # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    return jsonify({
-        "success": True,
-        "message": "Greyscale selected"
-    })
 
 
 # -------------------------

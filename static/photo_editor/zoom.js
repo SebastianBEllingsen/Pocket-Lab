@@ -1,7 +1,3 @@
-// ------------------------------------
-// Zoom mode
-// ------------------------------------
-
 let zoomMode = false;
 
 
@@ -30,6 +26,9 @@ image.addEventListener("click", async function (event) {
 
     // Get the displayed image position
     const rect = image.getBoundingClientRect();
+    console.log("Image rectangle:", rect);
+    console.log("Natural size:", image.naturalWidth, image.naturalHeight);
+    console.log("Displayed size:", rect.width, rect.height);
 
     // Get click position inside the displayed image
     const displayX = event.clientX - rect.left;
@@ -48,8 +47,6 @@ image.addEventListener("click", async function (event) {
     console.log("Natural image size:", image.naturalWidth, image.naturalHeight);
     console.log("Displayed image size:", rect.width, rect.height);
 
-    // Turn off zoom mode after one click
-    zoomMode = false;
 
 
     // Send the click position to Flask
