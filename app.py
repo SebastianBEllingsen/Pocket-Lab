@@ -284,21 +284,64 @@ def zoom_out():
 
 @app.route("/undo", methods=["POST"])
 def undo():
-    # TODO: Restore previous image from history
+
+    global current_image, current_index
+
+    # Check if we can undo
+    if current_index <= 0:
+        return jsonify({
+            "success": False,
+            "message": "Nothing to undo"
+        })
+
+    # Move one step back in history
+    current_index -= 1
+
+    # Restore the previous image
+    current_image = image_history[current_index]
+
+    # Save the restored image
+    image_url = save_result_image(
+        current_image,
+        "undo_image.jpg"
+    )
+
     return jsonify({
         "success": True,
-        "message": "Undo"
-    })
+        "message": "Undo",
+        "image_url": image_url
+
+                   })
 
 
 @app.route("/redo", methods=["POST"])
 def redo():
-    # TODO: Restore next image from history
+    global current_image, current_index
+
+    # Check if we can redo
+    if current_index >= len(image_history) - 1:
+        return jsonify({
+            "success": False,
+            "message": "Nothing to redo"
+        })
+
+    # Move one step forward in history
+    current_index += 1
+
+    # Restore the next image
+    current_image = image_history[current_index]
+
+    # Save the restored image
+    image_url = save_result_image(
+        current_image,
+        "redo_image.jpg"
+    )
+
     return jsonify({
         "success": True,
-        "message": "Redo"
-    })
-
+        "message": "Redo",
+        "image_url": image_url
+                   })
 
 # -------------------------
 # CELL COUNTING
