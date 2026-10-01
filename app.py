@@ -25,6 +25,25 @@ current_index = -1
 zoom_level = 1.0
 
 # -------------------------
+# IMAGE HISTORY
+# -------------------------
+
+def add_to_history(image):
+    global image_history, current_index
+
+    # Remove redo history
+    image_history = image_history[:current_index + 1]
+
+    # Store a copy of the image
+    image_history.append(image.copy())
+
+    # Move to the newest image
+    current_index = len(image_history) - 1
+
+    print("History length:", len(image_history))
+    print("Current index:", current_index)
+
+# -------------------------
 # Main page
 # -------------------------
 @app.route("/")
@@ -142,13 +161,20 @@ def crop():
     print("width:", width)
     print("height:", height)
 
-    current_image = crop_image(
+    # Create the cropped image
+    cropped_image = crop_image(
         current_image,
         x,
         y,
         width,
         height
     )
+
+    # Add the cropped image to history
+    add_to_history(cropped_image)
+
+    # Make the cropped image the current image
+    current_image = cropped_image
 
     filename = "cropped_image.jpg"
 
