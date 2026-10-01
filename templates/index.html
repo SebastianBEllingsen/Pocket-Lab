@@ -78,7 +78,7 @@
         <h3>Tools</h3>
 
 
-        <button onclick="sendAction('/crop')">
+        <button onclick="startCrop()">
             ✂ Crop
         </button>
 
@@ -196,14 +196,35 @@
 
             <!-- Selected image -->
 
-            <img
-                id="editorImage"
-                class="editor-image"
-                alt="Selected microscope image"
-                style="display: none;"
-            >
+             <div class="image-wrapper">
 
+        <img
+            id="editorImage"
+            class="editor-image"
+            alt="Selected microscope image"
+            style="display: none;"
+        >
 
+        <div id="cropOverlay" class="crop-overlay">
+
+            <div class="crop-handle top"></div>
+            <div class="crop-handle bottom"></div>
+            <div class="crop-handle left"></div>
+            <div class="crop-handle right"></div>
+
+        </div>
+
+                 <div class="crop-actions">
+                    <button id="applyCropButton" onclick="applyCrop()">
+                        ✓ Apply Crop
+                    </button>
+
+                    <button id="cancelCropButton" onclick="cancelCrop()">
+                        ✕ Cancel
+                    </button>
+                </div>
+
+    </div>
 
         </div>
 
@@ -420,7 +441,7 @@
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/image.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/zoom.js') }}"></script>
-
+<script src="{{ url_for('static', filename='photo_editor/crop.js') }}"></script>
 </body>
 
 </html>
