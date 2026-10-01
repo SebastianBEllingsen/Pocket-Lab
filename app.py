@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, url_for
 from cell_detection import detect_cells, draw_cells
 from processing.zoom import zoom_in
 from processing.image import open_image
+from processing.crop import crop_image
 import cv2
 import os
 
@@ -13,6 +14,7 @@ UPLOAD_FOLDER = os.path.join(app.static_folder, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 current_image = None
+original_image = None
 zoom_level = 1.0
 
 # -------------------------
@@ -24,7 +26,7 @@ def index():
 
 @app.route("/open-image", methods=["POST"])
 def open_image_route():
-    global current_image, zoom_level
+    global current_image, original_image, zoom_level
 
     # Check if an image was uploaded
     if "image" not in request.files:
@@ -50,6 +52,7 @@ def open_image_route():
 
     # Store the opened image
     current_image = image
+    original_image = current_image.copy()
 
     # New image starts at 100% zoom
     zoom_level = 1.0
@@ -106,10 +109,47 @@ def contour():
 
 @app.route("/crop", methods=["POST"])
 def crop():
-    # TODO: Add OpenCV crop
+
+    global current_image
+
+    if current_image is None:
+        return jsonify({
+            "success": False,
+            "message": "No image loaded"
+        })
+
+    data = request.get_json()
+
+    x = data["x"]
+    y = data["y"]
+    width = data["width"]
+    height = data["height"]
+
+    print("Crop received:")
+    print("x:", x)
+    print("y:", y)
+    print("width:", width)
+    print("height:", height)
+
+    current_image = crop_image(
+        current_image,
+        x,
+        y,
+        width,
+        height
+    )
+
+    filename = "cropped_image.jpg"
+
+    image_url = save_result_image(
+        current_image,
+        filename
+    )
+
     return jsonify({
         "success": True,
-        "message": "Crop tool selected"
+        "message": "Image cropped successfully",
+        "image_url": image_url
     })
 
 
