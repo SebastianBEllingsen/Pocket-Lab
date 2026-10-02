@@ -370,6 +370,11 @@ button:active {
     color: #aab0d0;
 }
 
+.history-buttons {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
 
 .separator {
     flex: 1;

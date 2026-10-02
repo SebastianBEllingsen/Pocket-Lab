@@ -50,13 +50,12 @@ async function openImage() {
             ).textContent = "100%";
 
             // Update the image name
-const imageStatus =
-    document.getElementById("image-status");
+            const imageStatus =
+            document.getElementById("image-status");
 
-console.log("imageStatus:", imageStatus);
 
-if (imageStatus) {
-    imageStatus.textContent = file.name;
+            if (imageStatus) {
+                imageStatus.textContent = data.filename;
 }
 
             showNotification(

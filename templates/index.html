@@ -136,9 +136,6 @@
             🔍+
         </button>
 
-        <button onclick="activateZoomIn()">
-            🔍−
-        </button>
 
     </div>
 
@@ -239,6 +236,7 @@
 
     </span>
 
+    <div class="history-buttons">
     <button onclick="sendAction('/undo')">
         ↶ Undo
     </button>
@@ -247,6 +245,10 @@
         ↷ Redo
     </button>
 
+    <button onclick="sendAction('/reset')">
+        ↻ Reset
+    </button>
+</div>
 </div>
 
     </div>
