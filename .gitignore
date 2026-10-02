@@ -227,3 +227,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# YOLO
+datasets/
+runs/
+yolo*.pt
