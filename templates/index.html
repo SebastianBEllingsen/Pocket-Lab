@@ -62,7 +62,7 @@
             📂 Open Image
         </button>
 
-        <button onclick="sendAction('/save-image')">
+        <button onclick="saveImage()">
             💾 Save
         </button>
 
@@ -136,9 +136,6 @@
             🔍+
         </button>
 
-        <button onclick="activateZoomIn()">
-            🔍−
-        </button>
 
     </div>
 
@@ -239,6 +236,7 @@
 
     </span>
 
+    <div class="history-buttons">
     <button onclick="sendAction('/undo')">
         ↶ Undo
     </button>
@@ -247,6 +245,10 @@
         ↷ Redo
     </button>
 
+    <button onclick="sendAction('/reset')">
+        ↻ Reset
+    </button>
+</div>
 </div>
 
     </div>
@@ -442,6 +444,8 @@
 <script src="{{ url_for('static', filename='photo_editor/image.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/zoom.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/crop.js') }}"></script>
+<script src="{{ url_for('static', filename='photo_editor/save.js') }}"></script>
+
 </body>
 
 </html>

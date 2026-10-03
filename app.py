@@ -3,6 +3,7 @@ from cell_detection import detect_cells, draw_cells
 from processing.zoom import zoom_in
 from processing.image import open_image
 from processing.crop import crop_image
+from processing.save import prepare_image_for_save
 import cv2
 import os
 
@@ -94,25 +95,67 @@ def open_image_route():
         "image_url": url_for(
             "static",
             filename="uploads/" + filename
-        )
+        ),
+        "filename": filename
     })
 
 @app.route("/save-image", methods=["POST"])
 def save_image():
-    # TODO: Add OpenCV save code here
-    return jsonify({
-        "success": True,
-        "message": "Save Image clicked - OpenCV code goes here"
-    })
+
+    # Check if an image is loaded
+    if current_image is None:
+        return jsonify({
+            "success": False,
+            "message": "No image loaded"
+        })
+
+    # Prepare the current image for saving
+    prepared_image = prepare_image_for_save(current_image)
+
+    # Check if the image could be prepared
+    if prepared_image is None:
+        return jsonify({
+            "success": False,
+            "message": "Could not prepare image for saving"
+        })
+
+    # Return the image data
+    return prepared_image, 200, {
+        "Content-Type": "image/jpeg"
+    }
 
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    # TODO: Restore original image using OpenCV
+
+    global current_image, original_image, image_history, current_index
+
+    # Check if an original image exists
+    if original_image is None:
+        return jsonify({
+            "success": False,
+            "message": "No image loaded"
+        })
+
+    # Restore the original image
+    current_image = original_image.copy()
+
+    # Reset image history
+    image_history = [current_image.copy()]
+    current_index = 0
+
+    # Save the reset image
+    image_url = save_result_image(
+        current_image,
+        "reset_image.jpg"
+    )
+
     return jsonify({
         "success": True,
-        "message": "Reset clicked - OpenCV code goes here"
+        "message": "Image reset successfully",
+        "image_url": image_url
     })
+
 
 
 # -------------------------
@@ -239,42 +282,6 @@ def zoom_in_route():
         "message": "Zoom in",
         "image_url": image_url
     })
-
-
-
-@app.route("/zoom-out", methods=["POST"])
-def zoom_out():
-    global current_image, zoom_level
-
-    if current_image is None:
-        return jsonify({
-            "success": False,
-            "message": "No image loaded"
-        })
-
-    # Decrease zoom level
-    zoom_level = max(0.2, zoom_level - 0.2)
-
-    height, width = current_image.shape[:2]
-
-    new_width = int(width * zoom_level)
-    new_height = int(height * zoom_level)
-
-    zoomed_image = cv2.resize(
-        current_image,
-        (new_width, new_height),
-        interpolation=cv2.INTER_LINEAR
-    )
-
-    # Save zoomed image
-    image_url = save_result_image(zoomed_image, "zoomed_image.jpg")
-    return jsonify({
-        "success": True,
-        "message": "Zoom out",
-        "zoom": int(zoom_level * 100),
-        "image_url": image_url
-    })
-
 
 
 
