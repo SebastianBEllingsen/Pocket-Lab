@@ -82,7 +82,7 @@
             ✂ Crop
         </button>
 
-        <button onclick="sendAction('/text')">
+        <button onclick="startText()">
             T Text
         </button>
 
@@ -219,13 +219,63 @@
                     <button id="cancelCropButton" onclick="cancelCrop()">
                         ✕ Cancel
                     </button>
-                </div>
+                 </div>
 
-    </div>
+           <div
+                id="textInputBox"
+                class="text-input-box"
+            >
+                <textarea
+                    id="textInput"
+                    placeholder="Write text..."
+                    rows="1"
+                ></textarea>
+
+                <div
+                    id="textResizeHandle"
+                    class="text-resize-handle"
+                ></div>
+            </div>
+
+                </div>
 
         </div>
 
+        <div
+            id="textControls"
+            class="text-controls"
+        >
 
+            <label>
+                Size:
+                <input
+                    type="number"
+                    id="textSize"
+                    value="1"
+                    min="0.5"
+                    max="5"
+                    step="0.1"
+                >
+            </label>
+
+            <label>
+                Color:
+                <input
+                    type="color"
+                    id="textColor"
+                    value="#ff0000"
+                >
+            </label>
+
+            <button onclick="applyText()">
+                ✓
+            </button>
+
+            <button onclick="cancelText()">
+                ✕
+            </button>
+
+        </div>
         <!-- BOTTOM TOOLBAR -->
 
 <div class="bottom-toolbar">
@@ -444,6 +494,7 @@
 <script src="{{ url_for('static', filename='photo_editor/image.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/zoom.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/crop.js') }}"></script>
+<script src="{{ url_for('static', filename='photo_editor/text.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/save.js') }}"></script>
 
 </body>

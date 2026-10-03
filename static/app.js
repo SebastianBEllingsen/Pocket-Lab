@@ -135,7 +135,7 @@ function selectTool(tool) {
     }
 
     else if (tool === "text") {
-        console.log("Text Box selected");
+        startText();
     }
 
     else if (tool === "arrow") {
