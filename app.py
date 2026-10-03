@@ -3,6 +3,8 @@ from cell_detection import detect_cells, draw_cells
 from processing.zoom import zoom_in
 from processing.image import open_image
 from processing.crop import crop_image
+from processing.text import add_text
+
 import cv2
 import os
 
@@ -192,12 +194,51 @@ def crop():
 
 @app.route("/text", methods=["POST"])
 def text():
-    # TODO: Add cv2.putText()
+
+    global current_image
+
+    if current_image is None:
+        return jsonify({
+            "success": False,
+            "message": "No image loaded"
+        })
+
+    data = request.get_json()
+
+    text_value = data["text"]
+    x = int(data["x"])
+    y = int(data["y"])
+
+    size = float(data["size"])
+    color = data["color"]
+
+    # Add text using OpenCV
+    text_image = add_text(
+        current_image,
+        text_value,
+        x,
+        y,
+        size,
+        color
+    )
+
+    # Add the new image to history
+    add_to_history(text_image)
+
+    # Make the text image the current image
+    current_image = text_image
+
+    # Save the result
+    image_url = save_result_image(
+        current_image,
+        "text_image.jpg"
+    )
+
     return jsonify({
         "success": True,
-        "message": "Text tool selected"
+        "message": "Text added successfully",
+        "image_url": image_url
     })
-
 
 
 def save_result_image(image, filename):

@@ -834,3 +834,174 @@ button:active {
     background: #555;
     color: white;
 }
+
+/* ========================================
+   TEXT INPUT
+   ======================================== */
+
+
+/* Input field on the image */
+
+.text-input-box {
+    position: absolute;
+
+    display: none;
+
+    width: 200px;
+    min-width: 80px;
+
+    z-index: 20;
+
+    box-sizing: border-box;
+}
+
+
+/* Text input field */
+#textInput {
+    width: 100%;
+    min-width: 80px;
+
+    min-height: 40px;
+
+    padding: 6px 10px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #4D3CCF;
+    border-radius: 6px;
+
+    outline: none;
+
+    background: transparent;
+
+    color: #222;
+
+    font-family: sans-serif;
+
+    font-size: 20px;
+
+    line-height: 1.2;
+
+    resize: none;
+
+    overflow: hidden;
+
+    cursor: text;
+}
+
+/* Highlight input field when active */
+
+#textInput:focus {
+    border: 1px solid #4D3CCF;
+
+    background: transparent;
+}
+
+
+/* ========================================
+   TEXT RESIZE HANDLE
+   ======================================== */
+
+.text-resize-handle {
+    position: absolute;
+
+    right: 0;
+    bottom: 0;
+
+    width: 10px;
+    height: 10px;
+
+    border-radius: 2px;
+
+    background: #4D3CCF;
+
+    cursor: nwse-resize;
+
+    z-index: 21;
+}
+
+
+/* ========================================
+   TEXT CONTROLS
+   ======================================== */
+
+
+/* Controls below the image */
+
+#textControls {
+    display: none;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    margin-top: 8px;
+
+    width: 100%;
+}
+
+
+/* Labels */
+
+#textControls label {
+    display: flex;
+
+    align-items: center;
+
+    gap: 4px;
+
+    font-size: 12px;
+}
+
+
+/* Size */
+
+#textControls #textSize {
+    width: 45px;
+    height: 26px;
+
+    padding: 2px 4px;
+
+    box-sizing: border-box;
+
+    font-size: 12px;
+
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+
+/* Color */
+
+#textControls #textColor {
+    width: 32px;
+    height: 26px;
+
+    padding: 2px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #ccc;
+    border-radius: 4px;
+
+    cursor: pointer;
+}
+
+
+/* Apply / Cancel buttons */
+
+#textControls button {
+    width: 30px;
+    height: 26px;
+
+    padding: 0;
+
+    border: none;
+    border-radius: 4px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+}
+
