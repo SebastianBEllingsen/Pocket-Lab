@@ -16,33 +16,60 @@ async function saveImage() {
         // Get the image as a Blob
         const imageBlob = await response.blob();
 
-        // Open the PC Save As dialog
-        const fileHandle = await window.showSaveFilePicker({
+        // Check if the browser supports Save As
+        if ("showSaveFilePicker" in window) {
 
-            suggestedName: "PocketLab_result.jpg",
+            // Open the PC Save As dialog
+            const fileHandle =
+                await window.showSaveFilePicker({
 
-            types: [
-                {
-                    description: "JPEG image",
-                    accept: {
-                        "image/jpeg": [".jpg"]
-                    }
-                }
-            ]
+                    suggestedName: "PocketLab_result.jpg",
 
-        });
+                    types: [
+                        {
+                            description: "JPEG image",
+                            accept: {
+                                "image/jpeg": [".jpg"]
+                            }
+                        }
+                    ]
 
-        // Create a writable file
-        const writable =
-            await fileHandle.createWritable();
+                });
 
-        // Write the image to the selected file
-        await writable.write(imageBlob);
+            // Create a writable file
+            const writable =
+                await fileHandle.createWritable();
 
-        // Close the file
-        await writable.close();
+            // Write the image to the selected file
+            await writable.write(imageBlob);
+
+            // Close the file
+            await writable.close();
+
+        } else {
+
+            // Fallback for browsers that do not support Save As
+            const imageUrl =
+                URL.createObjectURL(imageBlob);
+
+            const link =
+                document.createElement("a");
+
+            link.href = imageUrl;
+            link.download = "PocketLab_result.jpg";
+
+            document.body.appendChild(link);
+
+            link.click();
+
+            document.body.removeChild(link);
+
+            URL.revokeObjectURL(imageUrl);
+        }
+
 
         showNotification("Image saved successfully.");
+
 
     } catch (error) {
 
