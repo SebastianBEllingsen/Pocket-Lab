@@ -1010,3 +1010,26 @@ button:active {
     font-size: 14px;
 }
 
+#shapeCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    pointer-events: none;
+
+    display: none;
+}
+
+.shape-actions {
+    display: none;
+
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    gap: 10px;
+
+    z-index: 20;
+}
