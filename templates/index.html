@@ -107,15 +107,15 @@
             class="dropdown-menu"
         >
 
-            <button onclick="sendAction('/arrow')">
+            <button onclick="startShape('arrow')">
                 Arrow
             </button>
 
-            <button onclick="sendAction('/circle')">
+            <button onclick="startShape('circle')">
                 Circle
             </button>
 
-            <button onclick="sendAction('/rectangle')">
+            <button onclick="startShape('rectangle')">
                 Rectangle
             </button>
 
@@ -201,6 +201,7 @@
             alt="Selected microscope image"
             style="display: none;"
         >
+                 <canvas id="shapeCanvas"></canvas>
 
         <div id="cropOverlay" class="crop-overlay">
 
@@ -236,6 +237,24 @@
                     class="text-resize-handle"
                 ></div>
             </div>
+
+                 <div id="shapeActions" class="shape-actions">
+
+            <button
+                id="applyShapeButton"
+                onclick="applyShape()"
+            >
+                ✓ Apply
+            </button>
+
+            <button
+                id="cancelShapeButton"
+                onclick="cancelShape()"
+            >
+                ✕ Cancel
+            </button>
+
+        </div>
 
                 </div>
 
@@ -496,6 +515,7 @@
 <script src="{{ url_for('static', filename='photo_editor/crop.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/text.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/save.js') }}"></script>
+<script src="{{ url_for('static', filename='photo_editor/shape.js') }}"></script>
 
 </body>
 

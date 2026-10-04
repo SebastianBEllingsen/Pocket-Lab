@@ -5,7 +5,11 @@ from processing.image import open_image
 from processing.crop import crop_image
 from processing.save import prepare_image_for_save
 from processing.text import add_text
-
+from processing.shape import (
+    draw_rectangle,
+    draw_circle,
+    draw_arrow
+)
 import cv2
 import os
 
@@ -163,13 +167,122 @@ def reset():
 # -------------------------
 # TOOLS
 # -------------------------
+@app.route("/shape", methods=["POST"])
+def shape():
 
-@app.route("/rectangle", methods=["POST"])
-def rectangle():
-    # TODO: Add cv2.rectangle()
+    global current_image
+
+    if current_image is None:
+        return jsonify({
+            "success": False,
+            "message": "No image loaded"
+        })
+
+    data = request.get_json()
+
+    shape_type = data["shape"]
+
+    color = data.get(
+        "color",
+        [0, 0, 255]
+    )
+
+    thickness = int(
+        data.get("thickness", 2)
+    )
+
+
+    # Rectangle
+    if shape_type == "rectangle":
+
+        x = int(data["x"])
+        y = int(data["y"])
+        width = int(data["width"])
+        height = int(data["height"])
+
+        result = draw_rectangle(
+            current_image.copy(),
+            x,
+            y,
+            width,
+            height,
+            color,
+            thickness
+        )
+
+
+    # Circle
+    elif shape_type == "circle":
+
+        center_x = int(
+            data["center_x"]
+        )
+
+        center_y = int(
+            data["center_y"]
+        )
+
+        radius = int(
+            data["radius"]
+        )
+
+        result = draw_circle(
+            current_image.copy(),
+            center_x,
+            center_y,
+            radius,
+            color,
+            thickness
+        )
+
+
+    # Arrow
+    elif shape_type == "arrow":
+
+        x1 = int(data["x1"])
+        y1 = int(data["y1"])
+        x2 = int(data["x2"])
+        y2 = int(data["y2"])
+
+        result = draw_arrow(
+            current_image.copy(),
+            x1,
+            y1,
+            x2,
+            y2,
+            color,
+            thickness
+        )
+
+
+    else:
+
+        return jsonify({
+            "success": False,
+            "message": "Unknown shape"
+        })
+
+
+    # Add the completed shape
+    # as one history entry
+    add_to_history(result)
+
+    current_image = result
+
+
+    image_url = save_result_image(
+        current_image,
+        "shape_image.jpg"
+    )
+
+
     return jsonify({
         "success": True,
-        "message": "Rectangle tool selected"
+        "message": (
+            shape_type.capitalize()
+            + " added successfully"
+        ),
+        "image_url": image_url
     })
 
 
