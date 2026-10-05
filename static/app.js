@@ -121,6 +121,9 @@ function selectTool(tool) {
 
     console.log("Selected tool:", tool);
 
+    // Deactivate Zoom when another tool is selected
+    deactivateZoom();
+
     // Close the tools menu
     document.getElementById("mobileToolsMenu")
         .classList.remove("show");
