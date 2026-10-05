@@ -29,26 +29,30 @@ image_history = []
 # Points to the currently selected image version
 current_index = -1
 
-zoom_level = 1.0
+zoom_level = 100.0
 
 # -------------------------
 # IMAGE HISTORY
 # -------------------------
 
 def add_to_history(image):
-    global image_history, current_index
+    global image_history, current_index, zoom_level
 
     # Remove redo history
     image_history = image_history[:current_index + 1]
 
-    # Store a copy of the image
-    image_history.append(image.copy())
+    # Store image and current zoom level
+    image_history.append({
+        "image": image.copy(),
+        "zoom": zoom_level
+    })
 
-    # Move to the newest image
+    # Move to the newest history item
     current_index = len(image_history) - 1
 
     print("History length:", len(image_history))
     print("Current index:", current_index)
+    print("Zoom:", zoom_level)
 
 # -------------------------
 # Main page
@@ -87,12 +91,16 @@ def open_image_route():
     current_image = image
     original_image = current_image.copy()
 
+    # New image starts at 100% zoom
+    zoom_level = 100.0
+
     # Start a new image history
-    image_history = [image.copy()]
+    image_history = [{
+        "image": image.copy(),
+        "zoom": zoom_level
+    }]
     current_index = 0
 
-    # New image starts at 100% zoom
-    zoom_level = 1.0
 
     # Send image location back to JavaScript
     return jsonify({
@@ -102,7 +110,8 @@ def open_image_route():
             "static",
             filename="uploads/" + filename
         ),
-        "filename": filename
+        "filename": filename,
+        "zoom": zoom_level
     })
 
 @app.route("/save-image", methods=["POST"])
@@ -404,7 +413,8 @@ def save_result_image(image, filename):
 
 @app.route("/zoom-in", methods=["POST"])
 def zoom_in_route():
-    global current_image
+
+    global current_image, zoom_level
 
     if current_image is None:
         return jsonify({
@@ -423,18 +433,25 @@ def zoom_in_route():
     # Perform zoom using the function from zoom.py
     zoomed_image = zoom_in(current_image, x, y)
 
-    # Add the new zoomed image to history
+    # Increase zoom level
+    zoom_level += 20
+
+    # Add image and new zoom level to history
     add_to_history(zoomed_image)
 
     # Make the zoomed image the new current image
     current_image = zoomed_image
 
-    # Save zoomed image
-    image_url = save_result_image(zoomed_image, "zoomed_image.jpg")
+    image_url = save_result_image(
+        zoomed_image,
+        "zoomed_image.jpg"
+    )
+
     return jsonify({
         "success": True,
         "message": "Zoom in",
-        "image_url": image_url
+        "image_url": image_url,
+        "zoom": zoom_level
     })
 
 
@@ -446,7 +463,7 @@ def zoom_in_route():
 @app.route("/undo", methods=["POST"])
 def undo():
 
-    global current_image, current_index
+    global current_image, current_index, zoom_level
 
     # Check if we can undo
     if current_index <= 0:
@@ -459,7 +476,8 @@ def undo():
     current_index -= 1
 
     # Restore the previous image
-    current_image = image_history[current_index]
+    current_image = image_history[current_index]["image"]
+    zoom_level = image_history[current_index]["zoom"]
 
     # Save the restored image
     image_url = save_result_image(
@@ -470,29 +488,28 @@ def undo():
     return jsonify({
         "success": True,
         "message": "Undo",
-        "image_url": image_url
+        "image_url": image_url,
+        "zoom": zoom_level
 
                    })
 
 
 @app.route("/redo", methods=["POST"])
 def redo():
-    global current_image, current_index
 
-    # Check if we can redo
+    global current_image, current_index, zoom_level
     if current_index >= len(image_history) - 1:
         return jsonify({
             "success": False,
             "message": "Nothing to redo"
         })
 
-    # Move one step forward in history
     current_index += 1
 
-    # Restore the next image
-    current_image = image_history[current_index]
+    # Restore image and zoom level
+    current_image = image_history[current_index]["image"]
+    zoom_level = image_history[current_index]["zoom"]
 
-    # Save the restored image
     image_url = save_result_image(
         current_image,
         "redo_image.jpg"
@@ -501,8 +518,9 @@ def redo():
     return jsonify({
         "success": True,
         "message": "Redo",
-        "image_url": image_url
-                   })
+        "image_url": image_url,
+        "zoom": zoom_level
+    })
 
 # -------------------------
 # CELL COUNTING

@@ -78,15 +78,15 @@
         <h3>Tools</h3>
 
 
-        <button onclick="startCrop()">
+        <button onclick="deactivateZoom(); startCrop()">
             ✂ Crop
         </button>
 
-        <button onclick="startText()">
+        <button onclick="deactivateZoom(); startText()">
             T Text
         </button>
 
-        <button onclick="sendAction('/contour')">
+        <button onclick="deactivateZoom(); sendAction('/contour')">
             ✎ Draw
         </button>
 
@@ -107,39 +107,25 @@
             class="dropdown-menu"
         >
 
-            <button onclick="startShape('arrow')">
+            <button onclick="deactivateZoom(); startShape('arrow')">
                 Arrow
             </button>
 
-            <button onclick="startShape('circle')">
+            <button onclick="deactivateZoom(); startShape('circle')">
                 Circle
             </button>
 
-            <button onclick="startShape('rectangle')">
+            <button onclick="deactivateZoom(); startShape('rectangle')">
                 Rectangle
             </button>
 
         </div>
 
     </div>
-
-    </div>
-
-
-    <!-- ZOOM -->
-
-    <div class="tool-group">
-
-        <h3>Zoom</h3>
-
-        <button onclick="activateZoomIn()">
-            🔍+
+            <button onclick="activateZoomIn()">
+            🔍 Zoom in
         </button>
-
-
     </div>
-
-
 
 </section>
 
@@ -301,9 +287,7 @@
 
 
 
-    <span id="zoom-level">
-
-    </span>
+    <span id="zoom-level"></span>
 
     <div class="history-buttons">
     <button onclick="sendAction('/undo')">

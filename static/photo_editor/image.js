@@ -45,9 +45,12 @@ async function openImage() {
             ).style.display = "none";
 
             // Reset the zoom display for the new image
-            document.getElementById(
+            const zoomLevel = document.getElementById(
                 "zoom-level"
-            ).textContent = "100%";
+            );
+            if (zoomLevel) {
+                zoomLevel.textContent = data.zoom + "%"
+            }
 
             // Update the image name
             const imageStatus =
@@ -56,7 +59,7 @@ async function openImage() {
 
             if (imageStatus) {
                 imageStatus.textContent = data.filename;
-}
+            }
 
             showNotification(
                 "Image opened successfully"

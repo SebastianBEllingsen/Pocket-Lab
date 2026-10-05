@@ -1,5 +1,14 @@
 let zoomMode = false;
 
+// ------------------------------------
+// Deactivate Zoom In
+// ------------------------------------
+function deactivateZoom() {
+
+    zoomMode = false;
+
+    console.log("Zoom In mode deactivated");
+}
 
 // ------------------------------------
 // Activate Zoom In
@@ -75,6 +84,14 @@ image.addEventListener("click", async function (event) {
             data.image_url + "?t=" + new Date().getTime();
 
         console.log("Zoomed image displayed");
+
+        // Update zoom percentage
+        if (data.zoom) {
+
+            document.getElementById(
+                "zoom-level"
+            ).textContent = data.zoom + "%";
+        }
 
     } else {
 
