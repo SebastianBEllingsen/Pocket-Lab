@@ -20,7 +20,7 @@ KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 MIN_NUCLEUS_AREA = 1200   # purple group bigger than this = a WBC nucleus
 MAX_PLATELET_AREA = 600   # purple blob smaller than this = a platelet
 MIN_RBC_AREA = 600        # smaller "cells" are fragments, not RBCs
-MAX_RBC_AREA = 6000
+MAX_RBC_AREA = 12000
 
 
 def purple_mask(img):
@@ -91,6 +91,55 @@ def grow_wbc(nucleus, cells):
     cv2.circle(body, (cx, cy), int(radius * 1.1), 255, -1)
     return marker, body
 
+def find_rbc_seeds(area):
+    """
+    One seed per RBC centre. A peak in the distance map at distance d means a
+    cell of radius ~d, so any weaker peak closer than that is the same cell.
+    """
+    dist = cv2.distanceTransform(area, cv2.DIST_L2, 5)
+    local_max = cv2.dilate(dist, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
+    ys, xs = np.nonzero((dist == local_max) & (dist > 8))
+
+    seeds = np.zeros_like(area)
+    kept = []
+    for i in np.argsort(-dist[ys, xs]):  # strongest peak first
+        x, y, d = xs[i], ys[i], dist[ys[i], xs[i]]
+        if all(np.hypot(x - kx, y - ky) > max(d, kd) for kx, ky, kd in kept):
+            kept.append((x, y, d))
+            cv2.circle(seeds, (int(x), int(y)), 4, 255, -1)
+    return seeds
+
+
+def remove_nested_rbcs(boxes):
+    """
+    Drop small RBC pieces: boxes under half the normal RBC size that lie
+    mostly (70%+) inside a bigger RBC box are part of that same cell.
+    """
+    rbc = [b for b in boxes if b[0] == CLASSES.index("rbc")]
+    if not rbc:
+        return boxes
+    area = lambda b: (b[3] - b[1]) * (b[4] - b[2])
+    normal = np.median([area(b) for b in rbc])
+
+    pieces = set()
+    for small in rbc:
+        if area(small) >= 0.5 * normal:
+            continue
+        for big in rbc:
+            overlap = (max(0, min(small[3], big[3]) - max(small[1], big[1]))
+                       * max(0, min(small[4], big[4]) - max(small[2], big[2])))
+            if big is not small and area(big) > area(small) and overlap >= 0.7 * area(small):
+                pieces.add(small)
+
+    return [b for b in boxes if b not in pieces]
+
+
+def flood(image, markers, cells):
+    """Watershed: grow every seed in markers until the regions meet."""
+    markers = markers.copy()
+    markers[(cells > 0) & (markers == 1)] = 0  # let watershed decide these
+    return cv2.watershed(image, markers.astype(np.int32))
+
 
 def label_image(img, folder):
     """
@@ -131,36 +180,39 @@ def label_image(img, folder):
     if wbc_marker is not None:
         seed_area[wbc_body > 0] = 0
 
-    dist = cv2.distanceTransform(seed_area, cv2.DIST_L2, 5)
-    peaks = cv2.dilate(dist, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31)))
-    rbc_seeds = np.uint8((dist == peaks) & (dist > 8)) * 255
-    rbc_seeds = cv2.dilate(rbc_seeds, KERNEL, iterations=2)
+    rbc_seeds = find_rbc_seeds(seed_area)
 
     _, markers = cv2.connectedComponents(rbc_seeds)
-    markers = markers + 1                      # 1 = background
+    markers = markers + 1  # 1 = background
     wbc_label = markers.max() + 1
     if wbc_marker is not None:
         markers[wbc_marker > 0] = wbc_label
-    unknown = cv2.dilate(cells, KERNEL, iterations=2) > 0
-    markers[unknown & (markers == 1)] = 0      # let watershed decide these
-    markers = cv2.watershed(img, markers.astype(np.int32))
 
-    for label in np.unique(markers):
+    # 1. White cell: flood by image colour, which follows its edge well
+    wbc_region = np.zeros_like(cells)
+    if wbc_marker is not None:
+        by_colour = flood(img, markers, cells)
+        wbc_region = np.uint8((by_colour == wbc_label) & (cells > 0)) * 255 | wbc_marker
+        x, y, w, h = cv2.boundingRect(wbc_region)
+        if w * h > 0.3 * SIZE * SIZE:
+            return img, None  # probably two touching white cells
+        boxes.append((CLASSES.index(folder), x, y, x + w, y + h))
+
+    # 2. RBCs: remove the white cell, then flood the distance map, which
+    #    fills whole RBCs and ignores their pale centres
+    rbc_area = cv2.bitwise_and(cells, cv2.bitwise_not(wbc_region))
+    rbc_markers = markers.copy()
+    rbc_markers[rbc_markers == wbc_label] = 1
+    landscape = cv2.distanceTransform(rbc_area, cv2.DIST_L2, 5)
+    landscape = np.uint8(255 - cv2.normalize(landscape, None, 0, 255, cv2.NORM_MINMAX))
+    by_distance = flood(cv2.cvtColor(landscape, cv2.COLOR_GRAY2BGR), rbc_markers, rbc_area)
+
+    for label in np.unique(by_distance):
         if label <= 1:
             continue
-        region = np.uint8((markers == label) & (cells > 0)) * 255
-        if label == wbc_label:
-            region |= wbc_marker
+        region = np.uint8((by_distance == label) & (rbc_area > 0)) * 255
         x, y, w, h = cv2.boundingRect(region)
-        if w == 0 or h == 0:
-            continue
-        area = cv2.countNonZero(region)
-
-        if label == wbc_label:
-            if w * h > 0.3 * SIZE * SIZE:
-                return img, None  # probably two touching white cells
-            boxes.append((CLASSES.index(folder), x, y, x + w, y + h))
-        elif MIN_RBC_AREA < area < MAX_RBC_AREA:
+        if w > 0 and h > 0 and MIN_RBC_AREA < cv2.countNonZero(region) < MAX_RBC_AREA:
             boxes.append((CLASSES.index("rbc"), x, y, x + w, y + h))
 
     # Anything whose centre lies inside the white cell is part of it
@@ -170,6 +222,8 @@ def label_image(img, folder):
         _, wx1, wy1, wx2, wy2 = wbc[0]
         boxes = [b for b in boxes if b[0] >= 2 or not (
             wx1 <= (b[1] + b[3]) / 2 <= wx2 and wy1 <= (b[2] + b[4]) / 2 <= wy2)]
+
+    boxes = remove_nested_rbcs(boxes)
 
     return img, boxes
 
