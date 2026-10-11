@@ -1,6 +1,6 @@
 # Datasets
 
-The datasets are not final. Replace or add as needed. Root: `Data_Sets/`. Inspected on 2026-10-11.
+The datasets are not final. Replace or add as needed. Root: `Data_Sets/` (git-ignored, about 5 GB). Inspected on 2026-10-11. Loader names for the CLIs: `rbc-masks`/`1`, `bccd`/`2`, `pbc`/`3`.
 
 ## Data_Set_1: RBC segmentation masks
 - Path: `Data_Sets/Data_Set_1/Final data/Final data/New folder/{Original,Mask}`

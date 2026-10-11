@@ -25,12 +25,21 @@ Data_Sets/          datasets (not in version control; see docs/DATASETS.md)
 runs/               Ultralytics training output
 ```
 
+## Reading guide (to get familiar with the code)
+1. `docs/PLAN.md` (what and why), then `docs/CONVENTIONS.md` (how code is organised).
+2. `cellcount/bg_removal/pipeline.py`: the whole stage-1 algorithm in one readable file (steps are recorded in a trace).
+3. `cellcount/bg_removal/proposers.py` and `methods.py`: how the background colour is found and how the background field is built.
+4. `cellcount/bg_removal/config.py`: every tunable parameter and its default (each has a CLI flag).
+5. `cellcount/bg_removal/cli.py` and `panels.py`: the command line and what each view shows.
+6. `cellcount/common/` and `cellcount/viz/`: dataset loading, image selection, metrics and figure rendering (shared by all later stages).
+Run `python -m cellcount.bg_removal --explain --random 1` while reading: it shows each pipeline step with the values used.
+
 ## Setup
 ```
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
-Datasets are not included. Layout and sources: `docs/DATASETS.md`. Point to them with `--data-root DIR` or `export CELLCOUNT_DATA_ROOT=DIR` (default: `./Data_Sets`).
+Datasets are not included (3 so far: Data_Set_1 RBC masks, Data_Set_2 BCCD, Data_Set_3 PBC). Layout and sources: `docs/DATASETS.md`. Point to them with `--data-root DIR` or `export CELLCOUNT_DATA_ROOT=DIR` (default: `./Data_Sets`).
 
 ## Running stage 1: background removal
 ```
