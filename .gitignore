@@ -232,3 +232,7 @@ __marimo__/
 Data_Sets/
 runs/
 *.pt
+
+# Local tooling notes (not part of the project)
+CLAUDE.md
+.claude/

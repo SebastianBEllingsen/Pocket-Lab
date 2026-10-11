@@ -1,8 +1,11 @@
 import cv2 as cv
 import sys
+from pathlib import Path
 import numpy as np
 
-img = cv.imread("/home/sebastian/uni/year3/Machine_Vision/Course-Project/Data_Sets/Data_Set_2/dataset2-master/dataset2-master/images/test/NEUTROPHIL/_43_289.jpeg")
+# Usage: python main.py [IMAGE_PATH]   (default: a sample image from Data_Set_2)
+DEFAULT_IMAGE = Path(__file__).parent / "Data_Sets/Data_Set_2/dataset2-master/dataset2-master/images/test/NEUTROPHIL/_43_289.jpeg"
+img = cv.imread(sys.argv[1] if len(sys.argv) > 1 else str(DEFAULT_IMAGE))
 if img is None:
     sys.exit("Could not load image")
 
