@@ -21,6 +21,7 @@ From a blood smear image, count cells, classify red vs. white, then classify whi
 - [~] 1. Pre-processing: background removal built (awaiting Sebastian's verdict); stain normalization not started
 - [ ] 2. Segmentation of cells
 - [ ] 3. Per-image scale reference from RBCs
+- [ ] 3b. Debris/artifact filter (own step with its own CLI and parameters): drops blobs that are not cells (stain smudges, dust, dark corners) using size and shape relative to the RBC reference. Needs step 3, so it comes after it. Stage 1 stays pure background removal (Sebastian's decision 2026-10-11: split into separate steps to reduce coupling and allow tuning each step on its own).
 - [ ] 4. Overlap detection and clump counting
 - [ ] 5. Cell cut-out extraction (masks) for the synthetic generator
 - [ ] 6. Synthetic data generator
