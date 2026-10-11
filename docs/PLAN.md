@@ -29,13 +29,14 @@ From a blood smear image, count cells, classify red vs. white, then classify whi
 
 ## Current status (2026-10-11)
 - Step 0 done (datasets inspected; candidate extra datasets in IDEAS.md section 7, frameworks in section 8).
-- Step 1 (background removal) BUILT, AWAITING SEBASTIAN'S VISUAL VERDICT: `python -m cellcount.bg_removal`. Mean IoU about 0.90 against Data_Set_1 masks (20 random images: mean 0.904, min 0.829). BCCD has no masks; the output looked plausible on the 3 images checked, with touching RBCs merged into clumps (expected; splitting is step 2/4).
+- Step 1 (background removal) BUILT, AWAITING SEBASTIAN'S VISUAL VERDICT: `python -m cellcount.bg_removal`. Mean IoU about 0.89 against Data_Set_1 masks with the default `consensus` estimator (30 random images, seed 5: mean 0.890, min 0.753; the old `mode` rule had min 0.058). BCCD has no masks; the output looked plausible on the 3 images checked, with touching RBCs merged into clumps (expected; splitting is step 2/4).
 - One YOLO11n-cls run exists in `runs/classify/train/` (top-1 about 0.90 after epoch 1; CSV incomplete). Do not trust it until the split leakage question is settled.
 
 ## Where we left off (2026-10-11)
 - Built the shared infrastructure and the bg_removal CLI, with tests (5 passing). Rendered figures were only checked as saved PNGs; the interactive window (toggle keys, check boxes, arrow navigation) has NOT been run by Sebastian yet.
 - Waiting on Sebastian: run e.g. `python -m cellcount.bg_removal --full --worst 6 --stats`, `--explain --dataset 2 --boxes --index 7`, and give a verdict (good enough / what looks wrong), per the confer-at-every-step rule.
-- KNOWN FAILURE (found 2026-10-11): image 604478c7-1259-441a-8ad0-7059e191c9e4 (Data_Set_1, pale grey, 1944x1383, cells packed edge to edge) gets IoU 0.37. The `mode` estimator takes the cell colour as the background (foreground 95.7%, 6 blobs). Needs a better rule for choosing the background colour (e.g. brightest large mode, border/low-gradient regions, or a two-cluster fit). Not fixed yet; waiting for Sebastian's input.
+- FIXED (2026-10-11): image 604478c7 (pale grey, cells packed edge to edge) scored IoU 0.37 because the `mode` estimator took the cell colour as background. New default `consensus` estimator (Sebastian's idea): five proposers vote on the background colour, the majority wins; IoU now 0.90. See DECISIONS.md for the evidence. The viewer shows the votes as colour swatches in `--full` and `--explain`.
+- Still open: worst cases left are mostly about what the reference mask counts as a cell (dark stain blob, pale ghost cells, dust, dark corner). Need Sebastian's view on what should count as foreground.
 - Viewer fix (2026-10-11): legend and check boxes moved out of the images into a reserved footer strip (check boxes coloured like their outlines when interactive; legend below the image in saved PNGs). Sebastian to confirm.
 - Known weak spots to look at: pale/low-contrast images in Data_Set_1 (worst IoU cases), pale WBC cytoplasm and ghost RBCs in BCCD, outline of merged clumps.
 - Pending decisions: whether the course requires implementing methods ourselves vs. using frameworks (Cellpose, StarDist, SAM, ...); which extra datasets to download (PBC first, with Sebastian's okay); build our own splits by BCCD original image.

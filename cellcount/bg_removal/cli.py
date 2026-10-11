@@ -26,8 +26,8 @@ Output
     --thickness PX    outline width       --outline-ours/--outline-gt COLOR  override the auto colours
 
 Algorithm parameters (defaults come from BgConfig)
-    --method {mode,median} --scale --bins --tol --sigma-frac --kernel-frac --blur
-    --min-area-frac --no-fill-holes
+    --method {consensus,mode,median} --proposers a,b,c --agree-tol --min-cluster-frac --border-frac
+    --scale --bins --tol --sigma-frac --kernel-frac --blur --min-area-frac --no-fill-holes
 """
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ from ..common.datasets import available_datasets, get_dataset
 from ..common.selection import add_selection_args, print_listing, select_samples
 from .config import BgConfig
 from .methods import METHODS
+from .proposers import PROPOSERS
 from .panels import ViewOptions, build_page, scores
 from .pipeline import remove_background
 
@@ -74,6 +75,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     a = p.add_argument_group("algorithm")
     a.add_argument("--method", choices=sorted(METHODS), default=d.method)
+    a.add_argument("--proposers", default=",".join(d.proposers), metavar="A,B,C",
+                   help=f"consensus: voting colour proposers in tie-break order (available: {', '.join(sorted(PROPOSERS))})")
+    a.add_argument("--agree-tol", type=float, default=d.agree_tol, help="consensus: Lab distance within which proposals agree")
+    a.add_argument("--min-cluster-frac", type=float, default=d.min_cluster_frac, help="proposers: minimum cluster size (fraction of image)")
+    a.add_argument("--border-frac", type=float, default=d.border_frac, help="border proposer: frame width (fraction of size)")
     a.add_argument("--scale", type=float, default=d.scale, help="working resolution fraction")
     a.add_argument("--bins", type=int, default=d.bins, help="mode: Lab histogram bins per axis")
     a.add_argument("--tol", type=float, default=d.tol, help="mode: robust sigmas counted as background")
@@ -86,8 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def config_from_args(args: argparse.Namespace) -> BgConfig:
-    kw = {f.name: getattr(args, f.name) for f in fields(BgConfig) if f.name != "fill_holes"}
-    return BgConfig(**kw, fill_holes=not args.no_fill_holes)
+    kw = {f.name: getattr(args, f.name) for f in fields(BgConfig) if f.name not in ("fill_holes", "proposers")}
+    names = tuple(n.strip() for n in args.proposers.split(",") if n.strip())
+    unknown = [n for n in names if n not in PROPOSERS]
+    if unknown:
+        raise ValueError(f"unknown proposer(s) {unknown}; available: {sorted(PROPOSERS)}")
+    return BgConfig(**kw, proposers=names, fill_holes=not args.no_fill_holes)
 
 
 def main(argv: list[str] | None = None) -> int:

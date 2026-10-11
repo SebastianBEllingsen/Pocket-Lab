@@ -68,8 +68,13 @@ def _overlay_panel(img, result: BgResult, ref_mask, boxes: list[Box], o: ViewOpt
 
 def _step_panel(step) -> Panel:
     cap = step.caption + " | " + ", ".join(f"{k}: {v}" for k, v in step.values.items() if k != "threshold")
+    if step.kind == "swatches":
+        cap = step.caption
     if step.kind == "heatmap":
         return Panel(step.name, "heatmap", step.array, cap, extra={"cmap": "magma", "vmin": 0})
+    if step.kind == "swatches":
+        return Panel(step.name, "swatches", step.array, step.caption,
+                     extra={k: step.values[k] for k in ("labels", "agree", "chosen")})
     if step.kind == "hist":
         return Panel(step.name, "hist", step.array, step.caption,
                      extra={"threshold": step.values.get("threshold"), "xlabel": "Lab distance to background"})
@@ -81,21 +86,24 @@ def build_page(sample: Sample, img, result: BgResult, ref_mask, boxes: list[Box]
     cfg = result.config
     info = [
         f"image: {sample.name}  ({sample.dataset}, {img.shape[1]}x{img.shape[0]}px)",
-        f"method={cfg.method} scale={cfg.scale:g} bins={cfg.bins} tol={cfg.tol:g} sigma_frac={cfg.sigma_frac:g} "
+        f"method={cfg.method} proposers={','.join(cfg.proposers)} agree_tol={cfg.agree_tol:g} scale={cfg.scale:g} bins={cfg.bins} tol={cfg.tol:g} sigma_frac={cfg.sigma_frac:g} "
         f"blur={cfg.blur:g} min_area_frac={cfg.min_area_frac:g} fill_holes={cfg.fill_holes}",
+        f"background colour votes: {int(sc['votes_agree'])}/{int(sc['votes_total'])} agree" if sc["votes_total"] > 1 else "",
         f"Otsu threshold={sc['threshold']:.1f}  foreground={sc['foreground_pct']:.1f}%  blobs={int(sc['blobs'])}  "
         f"bg colour (Lab)=({', '.join(f'{v:.0f}' for v in result.reference_lab)})",
         ("IoU=%.3f  Dice=%.3f  (against the dataset's reference mask)" % (sc["iou"], sc["dice"]))
         if "iou" in sc else "no reference mask in this dataset: judge by eye (use --boxes for annotated boxes)",
     ]
+    info = [line for line in info if line]
     overlay = _overlay_panel(img, result, ref_mask, boxes, o)
     original = Panel("Original", "image", img)
     if o.view == "minimal":
         panels, cols = [original, overlay], 2
     elif o.view == "full":
-        panels = [original, _step_panel(result.trace[1]), _step_panel(result.trace[2]),
-                  _step_panel(result.trace[3]), _step_panel(result.trace[-1]), overlay]
-        cols = 3
+        by_name = {s.name: s for s in result.trace}
+        wanted = ["Background colour votes", "Background estimate", "Flattened", "Distance to background"]
+        panels = [original] + [_step_panel(by_name[n]) for n in wanted if n in by_name] + [_step_panel(result.trace[-1]), overlay]
+        cols = 4
     else:  # explain: every recorded step, then the overlay
         panels = [_step_panel(s) for s in result.trace] + [overlay]
         cols = 4

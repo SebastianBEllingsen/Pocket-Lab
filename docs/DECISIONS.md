@@ -20,6 +20,14 @@
 - 2026-10-11: Sebastian's visual verdict is the sign-off for each step; his ratings will later feed a golden set via a rating tool (not built yet).
 - 2026-10-11: Course rules allow any approach (frameworks or our own) as long as the choices are explained in the report. So every significant choice needs its reasoning recorded here (options considered, pros and cons, why chosen, evidence such as scores) to feed the report.
 
+### Decision record: how to pick the background colour (2026-10-11)
+- Problem: the single "most common colour" rule fails when cells cover most of the frame (pale grey Data_Set_1 image 604478c7: IoU 0.37, 96% marked foreground).
+- Options considered: (a) median filter of the image (`median`); (b) most common colour (`mode`); (c) let several independent proposers vote and take the colour most of them agree on (`consensus`, Sebastian's idea). Proposers: mode, bright (lightest large cluster), kmeans (lightest of 3 clusters), border (frame colour), neutral (least colourful large cluster).
+- Pros/cons: median is simple but wrong with dense cells. Mode is simple and usually right, but has a clear failure case. Consensus is robust to any single proposer failing, and the votes are visible in the viewer; it costs about 5x the colour-finding time (small, done at 0.25 scale) and needs the proposers to fail in different ways. Ties or no agreement fall back to the first proposer and are flagged.
+- Chosen: `consensus` as default. 
+- Evidence (30 random Data_Set_1 images, `--random 30 --seed 5`): mean IoU median 0.789 (min 0.090), mode 0.864 (min 0.058), consensus 0.890 (min 0.753). Image 604478c7: 0.368 -> 0.904 (mode was outvoted 4 to 1). Reproduce: `python -m cellcount.bg_removal --method {median,mode,consensus} --random 30 --seed 5 --stats`.
+- Remaining low scores (consensus, `--worst 5 --pool 150 --seed 1`: 0.46, 0.59, 0.71, 0.74, 0.74) are mostly label-policy questions rather than colour errors: a huge dark stain blob the reference mask leaves out (c6ab535c), and sparse pale/ghost cells, dust and a dark corner that we outline but the reference does not (ebb53337). To discuss with Sebastian.
+
 ## Open questions
 - Overlap idea as training-data preprocessing vs. an inference-time step (being discussed).
 - Data_Set_2 classification split leakage: check was inconclusive, see DATASETS.md. Decide whether to build our own split by BCCD original.

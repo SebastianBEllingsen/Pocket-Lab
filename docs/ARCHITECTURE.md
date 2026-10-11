@@ -12,7 +12,8 @@ cellcount/
   viz/overlay.py        RGBA layers: outlines, boxes, difference
   viz/figure.py         Page/Panel/Layer; interactive viewer (toggles, navigation) and PNG saving
   bg_removal/config.py  BgConfig dataclass (all defaults)
-  bg_removal/methods.py estimator registry: "mode" (default), "median"
+  bg_removal/proposers.py background-colour proposers (mode, bright, kmeans, border, neutral) that vote
+  bg_removal/methods.py estimator registry: "consensus" (default), "mode", "median"
   bg_removal/pipeline.py remove_background() -> BgResult with a full step trace
   bg_removal/panels.py  trace -> viewer pages (--minimal/--full/--explain)
   bg_removal/cli.py     python -m cellcount.bg_removal
@@ -20,7 +21,7 @@ tests/test_bg_removal.py  unittest (python -m unittest discover -s tests -t .)
 ```
 Coupling rules: `viz` and `common` never import a stage; stage `pipeline`/`methods` never import `viz`; only `panels.py` and `cli.py` know both sides. Algorithms return plain dataclasses, and the viewer renders from them.
 
-Background removal in short: the `mode` estimator finds the dominant colour (background), smooths a background field from matching pixels only (so vignetting is followed and cells ignored), then the mask is the Lab distance to that field, Otsu-thresholded, holes filled, specks removed. Measured: mean IoU about 0.90 on random Data_Set_1 images; BCCD judged by eye.
+Background removal in short: the default `consensus` estimator lets several proposers vote on the background colour (the colour most agree on wins), then smooths a background field from matching pixels only (so vignetting is followed and cells ignored), then the mask is the Lab distance to that field, Otsu-thresholded, holes filled, specks removed. Measured: mean IoU about 0.90 on random Data_Set_1 images; BCCD judged by eye.
 
 The old `src/preprocess.py` prototype was removed (superseded).
 

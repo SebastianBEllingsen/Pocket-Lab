@@ -53,7 +53,22 @@ class BackgroundRemovalTest(unittest.TestCase):
         names = [s.name for s in remove_background(img).trace]
         self.assertEqual(names[0], "Input")
         self.assertEqual(names[-1], "Specks removed")
-        self.assertEqual(len(names), 8)
+        self.assertIn("Background colour votes", names)          # consensus is the default
+        self.assertEqual(len(names), 9)
+        self.assertEqual(len(remove_background(img, BgConfig(method="mode")).trace), 9)
+        self.assertEqual(len(remove_background(img, BgConfig(method="median")).trace), 8)
+
+    def test_consensus_beats_a_wrong_proposer(self):
+        """Cells cover most of the frame, so the most common colour is a cell colour; the others outvote it."""
+        img = np.full((240, 320, 3), (225, 232, 228), np.uint8)
+        truth = np.zeros((240, 320), np.uint8)
+        for cy in range(30, 240, 55):
+            for cx in range(30, 320, 55):
+                cv.circle(truth, (cx, cy), 29, 255, -1)  # packed, ~60% coverage
+        img[truth > 0] = (150, 150, 150)
+        r = remove_background(img)
+        self.assertGreater(iou(r.mask > 0, truth > 0), 0.85)
+        self.assertLess(r.stats["votes_agree"], r.stats["votes_total"] + 1)
 
 
 if __name__ == "__main__":

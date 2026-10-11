@@ -8,7 +8,7 @@ Public API
     BgResult                  mask, flattened, background, distance, threshold, stats, trace
     remove_background(img, cfg=BgConfig())
 
-Steps recorded: input -> background estimate -> flattened -> distance to background
+Steps recorded: input -> background estimate (+ colour votes) -> flattened -> distance to background
 -> histogram + Otsu threshold -> raw mask -> holes filled -> specks removed (final).
 
 Flattening (image / background) is for display and downstream stages; the mask
@@ -31,7 +31,7 @@ from .methods import estimate
 class Step:
     name: str
     caption: str
-    kind: Literal["image", "heatmap", "hist", "mask"]
+    kind: Literal["image", "heatmap", "hist", "mask", "swatches"]
     array: np.ndarray
     values: dict[str, Any] = field(default_factory=dict)
 
@@ -83,6 +83,17 @@ def remove_background(img: np.ndarray, cfg: BgConfig = BgConfig()) -> BgResult:
                       {"method": cfg.method, **est.values,
                        "reference colour (Lab)": [round(v, 1) for v in est.reference_lab]}))
 
+    if est.proposals:
+        rgb = np.array([_lab_to_bgr(np.array([[p.lab]], np.float32))[0, 0][::-1] for p in est.proposals], np.uint8)
+        trace.append(Step("Background colour votes",
+                          "Each proposer names the background colour. Ticked = agrees with the winner; "
+                          + ("the winner's colour seeds the background field."
+                             if est.confident else "NO AGREEMENT: fell back to the first proposer."),
+                          "swatches", rgb,
+                          {"labels": [f"{p.name}: {p.note}" for p in est.proposals],
+                           "agree": list(est.agreeing), "chosen": est.chosen,
+                           "lab": [tuple(round(v) for v in p.lab) for p in est.proposals]}))
+
     flat = np.clip(img.astype(np.float32) / np.maximum(background.astype(np.float32), 1.0) * 255.0,
                    0, 255).astype(np.uint8)
     trace.append(Step("Flattened", "Image divided by the estimated background: uneven lighting removed, "
@@ -120,5 +131,5 @@ def remove_background(img: np.ndarray, cfg: BgConfig = BgConfig()) -> BgResult:
                       f"({cfg.min_area_frac:g} of image) removed. FINAL MASK", "mask", mask,
                       {"blobs removed": before - after, "blobs left": after}))
 
-    stats = {"threshold": threshold, "foreground_pct": 100.0 * float((mask > 0).mean()), "blobs": float(after)}
+    stats = {"votes_agree": float(sum(est.agreeing)), "votes_total": float(len(est.proposals)), "threshold": threshold, "foreground_pct": 100.0 * float((mask > 0).mean()), "blobs": float(after)}
     return BgResult(mask, flat, background, dist, threshold, est.reference_lab, cfg, trace, stats)

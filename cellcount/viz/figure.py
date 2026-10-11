@@ -5,7 +5,7 @@ A stage describes *what* to show with plain data objects; this module decides
 
 Public API
     Layer   one toggleable RGBA overlay (name, hotkey, rgba array, colour, label, visible)
-    Panel   one subplot: kind "image" | "heatmap" | "hist" | "overlay", plus title/caption
+    Panel   one subplot: kind "image" | "heatmap" | "hist" | "overlay" | "swatches", plus title/caption
     Page    one figure: title, info lines (shown at the top), panels, column count
     show_pages(pages)        interactive window; <-/-> change image, layer hotkeys and
                              check-boxes toggle overlays one at a time, q closes
@@ -16,6 +16,7 @@ Panel.data by kind
     heatmap   HxW float; extra: cmap, vmin, vmax
     hist      1-D values; extra: threshold (drawn as a vertical line), xlabel
     overlay   base BGR image; the layers go in Panel.layers
+    swatches  Nx3 RGB uint8 colours; extra: labels (list[str]), agree (list[bool]), chosen (int | None)
 """
 from __future__ import annotations
 
@@ -44,7 +45,7 @@ class Layer:
 @dataclass
 class Panel:
     title: str
-    kind: Literal["image", "heatmap", "hist", "overlay"]
+    kind: Literal["image", "heatmap", "hist", "overlay", "swatches"]
     data: Any = None
     caption: str = ""
     layers: list[Layer] = field(default_factory=list)
@@ -127,6 +128,19 @@ class PageView:
                 ax.legend(fontsize=7)
             ax.set_xlabel(panel.extra.get("xlabel", ""), fontsize=7)
             ax.tick_params(labelsize=7)
+        elif panel.kind == "swatches":
+            from matplotlib.patches import Rectangle
+
+            e, cols = panel.extra, np.asarray(panel.data)
+            n = len(cols)
+            ax.set_xlim(0, 10)
+            ax.set_ylim(n, 0)
+            ax.axis("off")
+            for i, c in enumerate(cols):
+                ax.add_patch(Rectangle((0, i + 0.1), 1.6, 0.8, color=np.asarray(c) / 255, ec="black", lw=1.5 if i == e.get("chosen") else 0.5))
+                mark = "[x]" if e["agree"][i] else "[ ]"
+                bold = "bold" if i == e.get("chosen") else "normal"
+                ax.text(1.8, i + 0.5, f"{mark} {textwrap.shorten(e['labels'][i], 44)}", va="center", fontsize=7, fontweight=bold)
         elif panel.kind == "overlay":
             ax.imshow(_rgb(panel.data))
             for layer in panel.layers:
@@ -134,7 +148,7 @@ class PageView:
             self._overlay_axes.append((ax, panel))
         else:
             raise ValueError(f"Unknown panel kind {panel.kind!r}")
-        if panel.kind != "hist":
+        if panel.kind not in ("hist", "swatches"):
             ax.set_xticks([])
             ax.set_yticks([])
         if panel.caption:

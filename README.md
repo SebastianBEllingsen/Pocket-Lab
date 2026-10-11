@@ -41,13 +41,15 @@ python -m cellcount.bg_removal --explain --image <name>        # every step with
 python -m cellcount.bg_removal --dataset 2 --boxes --index 7   # BCCD with annotated boxes
 python -m cellcount.bg_removal --random 8 --save out/          # write PNGs instead of a window
 python -m cellcount.bg_removal --list                          # image indices and names
+python -m cellcount.bg_removal --method mode --worst 6 --stats # compare against the older single-rule estimator
+python -m cellcount.bg_removal --proposers mode,border --full  # choose which proposers vote
 ```
 In the window: left/right arrows change image, keys `o`/`g`/`d`/`b` (or the check boxes) toggle our outline, the dataset's reference mask, the difference map and annotated boxes; `q` closes.
 
 Tests: `python -m unittest discover -s tests -t .`
 
 ## Status
-Early stage. Stage 1 is built and awaiting review (mean IoU about 0.90 on Data_Set_1). See "Where we left off" in `docs/PLAN.md`. For each component we check maintained open-source frameworks first and weigh adopting them against building our own (`docs/IDEAS.md` section 8).
+Early stage. Stage 1 is built and awaiting review (mean IoU about 0.89 on Data_Set_1). See "Where we left off" in `docs/PLAN.md`. For each component we check maintained open-source frameworks first and weigh adopting them against building our own (`docs/IDEAS.md` section 8).
 
 ## Version control
 Local git, committed regularly. We do not push automatically. `Data_Sets/`, `runs/` and model weights (`*.pt`) are git-ignored.
