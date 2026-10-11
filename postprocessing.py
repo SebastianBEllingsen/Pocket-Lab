@@ -1,8 +1,10 @@
 """
-Preprocessing that corrects YOLO's red cell boxes.
+Post-processing that corrects YOLO's red cell boxes after detection.
 
 YOLO's weak spot is clusters of overlapping or pale red cells: it puts one
-box over 2-3 cells, or misses pale cells. This file:
+box over 2-3 cells, or misses pale cells. This file builds a cell mask from
+the image (steps 1-3; YOLO never sees this processed image) and uses it to
+correct YOLO's boxes (step 4):
 
     1. enhance            -> cells bright, background black
     2. remove background  -> mask of all cells
@@ -115,7 +117,7 @@ def refine_red_cells(img, cells):
     if not yolo_rbc:
         return cells
 
-    # Preprocess at 360 x 360
+    # Build the cell mask at 360 x 360
     small = cv2.resize(img, (SIZE, SIZE))
     sx, sy = img.shape[1] / SIZE, img.shape[0] / SIZE
     mask = remove_background(enhance(small))

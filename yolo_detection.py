@@ -6,10 +6,10 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
-from preprocessing import refine_red_cells
+from postprocessing import refine_red_cells
 
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "blood_cells.pt"
-REFINE = True      # correct YOLO's red cells with the preprocessing (preprocessing.py)
+REFINE = True      # correct YOLO's red cells with the post-processing (postprocessing.py)
 CONFIDENCE = 0.35  # best setting from evaluate.py (lowest RBC count error)
 
 WBC_TYPES = ["basophil", "eosinophil", "erythroblast", "ig", "lymphocyte", "monocyte", "neutrophil"]
