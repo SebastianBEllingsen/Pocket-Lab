@@ -7,7 +7,8 @@ Public API
 of each overlay layer. Layer hotkeys: o = ours, g = ground truth, d = difference, b = boxes.
 
 Reference ("ground truth") means the mask that ships with the dataset (Data_Set_1);
-it is the dataset authors' answer, not our own golden set.
+it is the dataset authors' answer (one annotator's opinion of what counts as a cell),
+not our own golden set.
 """
 from __future__ import annotations
 
@@ -55,9 +56,9 @@ def _overlay_panel(img, result: BgResult, ref_mask, boxes: list[Box], o: ViewOpt
     layers = [Layer("ours", "o", outline_rgba(ours, c_ours, t), c_ours, "ours (this algorithm)", o.show_ours)]
     if ref_mask is not None:
         layers.append(Layer("gt", "g", outline_rgba(ref_mask, c_gt, t), c_gt,
-                            "ground truth (dataset mask)", o.show_gt))
+                            "reference mask (dataset)", o.show_gt))
         layers.append(Layer("diff", "d", diff_rgba(ours, ref_mask, c_ours, c_gt), c_ours,
-                            "difference (ours only / truth only)", o.show_diff))
+                            "difference (ours only / reference only)", o.show_diff))
     if boxes:
         box_colors = dict(zip(labels, palette[2:]))
         layers.append(Layer("boxes", "b", boxes_rgba(img.shape[:2], boxes, box_colors, t),
