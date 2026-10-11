@@ -236,3 +236,4 @@ runs/
 # Local tooling notes (not part of the project)
 CLAUDE.md
 .claude/
+PIPELINE_STATUS.md

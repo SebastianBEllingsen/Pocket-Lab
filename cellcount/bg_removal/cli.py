@@ -14,7 +14,7 @@ Views (choose one; default --minimal)
     --explain   every pipeline step with the values used, then the result
 
 Data and selection (shared by all stages, see cellcount/common/selection.py)
-    --dataset NAME    1/rbc-masks (default) or 2/bccd        --data-root DIR
+    --dataset NAME    1/rbc-masks (default), 2/bccd or 3/pbc    --data-root DIR
     --image/--index/--random/--worst/--pool/--seed/--list
 
 Output
@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     o.add_argument("--save", metavar="DIR", help="write one PNG per image into DIR")
     o.add_argument("--stats", action="store_true", help="print a score table to the terminal")
     o.add_argument("--no-ours", action="store_true", help="start with our outline hidden")
-    o.add_argument("--no-gt", action="store_true", help="start with the ground-truth outline hidden")
+    o.add_argument("--no-gt", action="store_true", help="start with the reference-mask outline hidden")
     o.add_argument("--diff", action="store_true", help="start with the difference layer shown")
     o.add_argument("--boxes", action="store_true", help="start with annotated boxes shown (BCCD)")
     o.add_argument("--thickness", type=int, default=None, help="outline width in px (default scales with image)")
@@ -81,9 +81,9 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--min-cluster-frac", type=float, default=d.min_cluster_frac, help="proposers: minimum cluster size (fraction of image)")
     a.add_argument("--border-frac", type=float, default=d.border_frac, help="border proposer: frame width (fraction of size)")
     a.add_argument("--scale", type=float, default=d.scale, help="working resolution fraction")
-    a.add_argument("--bins", type=int, default=d.bins, help="mode: Lab histogram bins per axis")
-    a.add_argument("--tol", type=float, default=d.tol, help="mode: robust sigmas counted as background")
-    a.add_argument("--sigma-frac", type=float, default=d.sigma_frac, help="mode: background smoothing (fraction of size)")
+    a.add_argument("--bins", type=int, default=d.bins, help="Lab histogram bins per axis (colour proposers, mode method)")
+    a.add_argument("--tol", type=float, default=d.tol, help="robust sigmas around the background colour counted as background")
+    a.add_argument("--sigma-frac", type=float, default=d.sigma_frac, help="background-field smoothing (fraction of image size)")
     a.add_argument("--kernel-frac", type=float, default=d.kernel_frac, help="median: kernel size (fraction of size)")
     a.add_argument("--blur", type=float, default=d.blur, help="distance-map blur sigma in px")
     a.add_argument("--min-area-frac", type=float, default=d.min_area_frac, help="remove blobs smaller than this fraction")
