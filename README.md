@@ -48,3 +48,6 @@ Tests: `python -m unittest discover -s tests -t .`
 
 ## Status
 Early stage. Stage 1 is built and awaiting review (mean IoU about 0.90 on Data_Set_1). See "Where we left off" in `docs/PLAN.md`. For each component we check maintained open-source frameworks first and weigh adopting them against building our own (`docs/IDEAS.md` section 8).
+
+## Version control
+Local git, committed regularly. We do not push automatically. `Data_Sets/`, `runs/` and model weights (`*.pt`) are git-ignored.

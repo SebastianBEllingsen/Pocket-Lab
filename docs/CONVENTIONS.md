@@ -28,6 +28,10 @@ Every source file starts with a module docstring that contains: what the file is
   - Display: `--show` (window), `--save DIR`, plus a view-level flag (for example `--full` for the full comparison, `--minimal` for original vs. final).
 - Visual output must carry enough information to understand what is going on (titles, parameter values, scores, image names); exact content agreed per stage.
 
+## Version control
+- Commit locally after each logical change, with a message that says what and why. One change per commit.
+- Never push unless Sebastian explicitly asks. Data, training runs and weights are git-ignored and must never be added.
+
 ## Review loop
 - Each stage ships a CLI, Sebastian looks at the output, and Sebastian's verdict is the sign-off. Verdicts are recorded in `docs/DECISIONS.md`.
 - Planned: a rating tool where Sebastian marks outputs good/bad (or other parameters). Ratings are saved to disk and become part of the "golden" evaluation set.
