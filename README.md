@@ -39,7 +39,25 @@ Run `python -m cellcount.bg_removal --explain --random 1` while reading: it show
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
-Datasets are not included (3 so far: Data_Set_1 RBC masks, Data_Set_2 BCCD, Data_Set_3 PBC). Layout and sources: `docs/DATASETS.md`. Point to them with `--data-root DIR` or `export CELLCOUNT_DATA_ROOT=DIR` (default: `./Data_Sets`).
+Datasets are not included (3 so far). Layout and details: `docs/DATASETS.md`. Point to them with `--data-root DIR` or `export CELLCOUNT_DATA_ROOT=DIR` (default: `./Data_Sets`).
+
+| Folder | Content | Source |
+|---|---|---|
+| `Data_Set_1` | RBC segmentation masks (1328 image/mask pairs) | https://github.com/Deponker/Blood-cell-segmentation-dataset |
+| `Data_Set_2/bccd-shenggan` | BCCD, full fields with RBC/WBC/platelet boxes | https://github.com/Shenggan/BCCD_Dataset |
+| `Data_Set_2/bccd-kaggle` | BCCD images with WBC subtype `labels.csv` (RBC-only boxes) | https://www.kaggle.com/datasets/paultimothymooney/blood-cells |
+| `Data_Set_2/dataset2-master` | derived 4-class classification set (not on disk right now) | same Kaggle dataset |
+| `Data_Set_3` | PBC, single-cell images in 8 classes (CC BY 4.0) | https://data.mendeley.com/datasets/snkd93bnjr (DOI 10.17632/snkd93bnjr.1) |
+
+### Getting the data
+Only the background removal needs data so far. Create `Data_Sets/` in the repo root (or anywhere, then use `--data-root`) with this layout:
+```
+Data_Sets/
+  Data_Set_1/Final data/Final data/New folder/{Original,Mask}/   # default dataset: unzip the Google Drive download linked above
+  Data_Set_2/bccd-shenggan/BCCD/{JPEGImages,Annotations}/        # optional (--dataset 2): git clone https://github.com/Shenggan/BCCD_Dataset Data_Sets/Data_Set_2/bccd-shenggan
+  Data_Set_3/extracted/PBC_dataset_normal_DIB/<class>/*.jpg      # optional (--dataset 3): unzip the Mendeley download into Data_Set_3/extracted/
+```
+`Data_Set_2/bccd-kaggle` (subtype labels) and `dataset2-master` are not needed for stage 1. `model.py` and `main.py` are early personal experiments and need `dataset2-master` from the Kaggle dataset; ignore them for now.
 
 ## Running stage 1: background removal
 ```

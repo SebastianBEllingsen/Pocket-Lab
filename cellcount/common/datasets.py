@@ -14,7 +14,7 @@ Public API
 
 Dataset names (aliases in brackets)
     rbc-masks ("1")   Data_Set_1: purple smears with binary cell masks
-    bccd ("2")        Data_Set_2/dataset-master: BCCD full fields with VOC boxes
+    bccd ("2")        Data_Set_2/bccd-shenggan: BCCD full fields with VOC boxes
     pbc ("3")         Data_Set_3: PBC single-cell images, label = class folder name
 """
 from __future__ import annotations
@@ -137,7 +137,7 @@ def _load_rbc_masks(root: Path) -> list[Sample]:
 
 @register_dataset("bccd", "2")
 def _load_bccd(root: Path) -> list[Sample]:
-    base = root / "Data_Set_2" / "dataset-master" / "dataset-master"
+    base = root / "Data_Set_2" / "bccd-shenggan"
     out = []
     for img in (base / "JPEGImages").glob("*.jpg"):
         xml = base / "Annotations" / f"{img.stem}.xml"
