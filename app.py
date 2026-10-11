@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, url_for
 from werkzeug.utils import secure_filename
-from cell_detection import detect_cells, draw_cells
+from collections import Counter
+from yolo_detection import detect_cells, draw_cells, WBC_TYPES
 import cv2
 import os
 
@@ -14,6 +15,7 @@ UPLOAD_FOLDER = os.path.join(app.static_folder, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 current_image = None
+current_cells = []  # cells found by YOLO in current_image
 zoom_level = 1.0
 
 # -------------------------
@@ -30,7 +32,7 @@ def index():
 
 @app.route("/open-image", methods=["POST"])
 def open_image():
-    global current_image, zoom_level
+    global current_image, current_cells, zoom_level
 
     # Check if an image was uploaded
     if "image" not in request.files:
@@ -72,6 +74,9 @@ def open_image():
 
     # New image starts at 100% zoom
     zoom_level = 1.0
+
+    # Find the cells once; the count/show buttons reuse the result
+    current_cells = detect_cells(current_image)
 
     # Print information about the image
     print("Image opened successfully!")
@@ -270,12 +275,12 @@ def count_red():
     if current_image is None:
         return jsonify({"success": False, "count": "--", "message": "No image loaded"})
 
-    rbc_contours, _ = detect_cells(current_image)
+    count = sum(1 for cell in current_cells if cell["type"] == "rbc")
 
     return jsonify({
         "success": True,
-        "count": len(rbc_contours),
-        "message": f"Found {len(rbc_contours)} red blood cells"
+        "count": count,
+        "message": f"Found {count} red blood cells"
     })
 
 
@@ -284,65 +289,48 @@ def count_white():
     if current_image is None:
         return jsonify({"success": False, "count": "--", "message": "No image loaded"})
 
-    _, wbc_contours = detect_cells(current_image)
+    types = Counter(cell["type"] for cell in current_cells if cell["type"] in WBC_TYPES)
+    count = sum(types.values())
+    details = ", ".join(f"{n} {name}" for name, n in types.items())
 
     return jsonify({
         "success": True,
-        "count": len(wbc_contours),
-        "message": f"Found {len(wbc_contours)} white blood cells"
+        "count": count,
+        "message": f"Found {count} white blood cells" + (f" ({details})" if details else "")
     })
 
 
-# -------------------------¢
+# -------------------------
 # SHOW CELLS
 # -------------------------
 
-@app.route("/show-red", methods=["POST"])
-def show_red():
+def show_cells(filename, message, **options):
     if current_image is None:
         return jsonify({"success": False, "message": "No image loaded"})
 
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=True, show_white=False)
-    image_url = save_result_image(result, "cells_red.jpg")
+    result = draw_cells(current_image, current_cells, **options)
+    image_url = save_result_image(result, filename)
 
     return jsonify({
         "success": True,
-        "message": "Showing red blood cells",
+        "message": message,
         "image_url": image_url
     })
+
+
+@app.route("/show-red", methods=["POST"])
+def show_red():
+    return show_cells("cells_red.jpg", "Showing red blood cells", show_red=True, show_white=False)
 
 
 @app.route("/show-white", methods=["POST"])
 def show_white():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=False, show_white=True)
-    image_url = save_result_image(result, "cells_white.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing white blood cells",
-        "image_url": image_url
-    })
+    return show_cells("cells_white.jpg", "Showing white blood cells", show_red=False, show_white=True)
 
 
 @app.route("/show-all", methods=["POST"])
 def show_all():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours)
-    image_url = save_result_image(result, "cells_all.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing all cells",
-        "image_url": image_url
-    })
+    return show_cells("cells_all.jpg", "Showing all cells", show_platelets=True)
 
 
 if __name__ == "__main__":
