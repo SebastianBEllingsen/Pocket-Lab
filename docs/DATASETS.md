@@ -24,6 +24,13 @@ The datasets are not final. Replace or add as needed. Root: `Data_Sets/`. Inspec
 - Lowercase symlinks `train`->TRAIN, `val`->TEST, `test`->TEST_SIMPLE (Ultralytics naming), so `model.val(split="test")` uses only the 71 skewed TEST_SIMPLE images.
 - Leakage check (2026-10-11), INCONCLUSIVE: about 12k images derive from about 360 originals. A flip-invariant thumbnail comparison showed test images are no closer to train than train images are to each other, and ORB matching against 1500 train images found no exact duplicates (best good-match counts 4-26 of 500 features, a few higher). Rotated/shifted augmentations would defeat both tests. From general knowledge, this classification set was built by augmenting first and splitting after, which would leak (unverified). Safe approach: build our own splits by original BCCD image.
 
+## Data_Set_3: PBC (single-cell images by class)
+- Path: `Data_Sets/Data_Set_3/extracted/PBC_dataset_normal_DIB/<class>/*.jpg` (zip kept next to it as `PBC_dataset_normal_DIB.zip`). Licence CC BY 4.0. Source: Acevedo et al. 2020, Mendeley Data (see IDEAS.md section 7).
+- 17,093 JPG files (360x363, one cell in the centre), 8 classes: neutrophil 3329, eosinophil 3117, ig (immature granulocyte) 2895, platelet 2348, erythroblast 1551, monocyte 1420, basophil 1218, lymphocyte 1214.
+- Loader: dataset name `pbc` or `3`; `Sample.label` holds the class folder name. No masks or boxes.
+- Use: WBC subtype classifier (all five subtypes, with far more basophils, lymphocytes and monocytes than BCCD), plus single-cell cut-outs for the synthetic generator. Not for counting or zoom invariance (one fixed zoom, one cell per image, CellaVision stain).
+- Caveat: different scanner, stain and background than BCCD, so a classifier trained on PBC alone may not transfer to BCCD-style images; test cross-dataset.
+
 ## Notes
 - Stain, background and zoom differ strongly between Data_Set_1 and BCCD (see IDEAS.md section 4).
 - No dataset has instance masks separating overlapping cells. The overlap method has to supply that.

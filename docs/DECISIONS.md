@@ -31,7 +31,7 @@
 ## Open questions
 - Overlap idea as training-data preprocessing vs. an inference-time step (being discussed).
 - Data_Set_2 classification split leakage: check was inconclusive, see DATASETS.md. Decide whether to build our own split by BCCD original.
-- PBC download approved (2026-10-11) but not yet downloaded: Mendeley has no scriptable link, Sebastian to download manually (or give a Kaggle mirror) into `Data_Sets/PBC/`. Other candidates still need his okay.
+- PBC downloaded by Sebastian as Data_Set_3 and extracted (2026-10-11). Other candidate datasets still need his okay.
 - DECIDED 2026-10-11 (Sebastian): stage 1 stays pure background removal (foreground = everything unlike the background). "Is it a cell?" is a separate later step (3b, debris filter) with its own CLI and parameters, so each step can be tuned independently. Reason: less coupling, and removing something early cannot be undone. Consequence: scores against the Data_Set_1 reference mask understate stage-1 quality on images with debris; images with a policy dispute can be marked ambiguous in the golden set. Still to confirm: whether to mark them ambiguous.
 - Server: probably an RTX 4070; access requested, details pending.
 - Where to find more data: full fields with subtype labels, more lymphocytes/monocytes/basophils, higher zoom WBC images.

@@ -15,6 +15,7 @@ Public API
 Dataset names (aliases in brackets)
     rbc-masks ("1")   Data_Set_1: purple smears with binary cell masks
     bccd ("2")        Data_Set_2/dataset-master: BCCD full fields with VOC boxes
+    pbc ("3")         Data_Set_3: PBC single-cell images, label = class folder name
 """
 from __future__ import annotations
 
@@ -49,6 +50,7 @@ class Sample:
     image_path: Path
     mask_path: Path | None = None
     annotation_path: Path | None = None
+    label: str | None = None   # class label for classification datasets (e.g. cell type)
 
     def load_image(self) -> np.ndarray:
         """BGR uint8 image."""
@@ -141,3 +143,10 @@ def _load_bccd(root: Path) -> list[Sample]:
         xml = base / "Annotations" / f"{img.stem}.xml"
         out.append(Sample("bccd", img.stem, img, annotation_path=xml if xml.exists() else None))
     return out
+
+
+@register_dataset("pbc", "3")
+def _load_pbc(root: Path) -> list[Sample]:
+    base = root / "Data_Set_3" / "extracted" / "PBC_dataset_normal_DIB"
+    return [Sample("pbc", img.stem, img, label=img.parent.name)
+            for img in base.glob("*/*") if img.suffix.lower() in IMAGE_SUFFIXES]
