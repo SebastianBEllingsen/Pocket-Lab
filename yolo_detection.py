@@ -6,7 +6,10 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
+from preprocessing import refine_red_cells
+
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "blood_cells.pt"
+REFINE = True      # correct YOLO's red cells with the preprocessing (preprocessing.py)
 CONFIDENCE = 0.35  # best setting from evaluate.py (lowest RBC count error)
 
 WBC_TYPES = ["basophil", "eosinophil", "erythroblast", "ig", "lymphocyte", "monocyte", "neutrophil"]
@@ -28,7 +31,7 @@ def get_model():
     return _model
 
 
-def detect_cells(img):
+def detect_cells(img, refine=REFINE):
     """
     Return a list of cells found in a BGR image, e.g.
     [{"type": "rbc", "confidence": 0.91, "box": (x1, y1, x2, y2)}, ...]
@@ -46,6 +49,8 @@ def detect_cells(img):
             "confidence": confidence,
             "box": tuple(int(v) for v in box),
         })
+    if refine:
+        cells = refine_red_cells(img, cells)
     return cells
 
 
