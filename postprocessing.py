@@ -106,6 +106,23 @@ def area(box):
     return (box[2] - box[0]) * (box[3] - box[1])
 
 
+def remove_nested(boxes):
+    """
+    Drop boxes that lie mostly (70%+) inside a bigger box: when the watershed
+    finds only part of a cell, that part sits inside the box of the whole
+    cell, and counting both would count one cell twice.
+    """
+    nested = []
+    for small in boxes:
+        for big in boxes:
+            overlap = (max(0, min(small[2], big[2]) - max(small[0], big[0]))
+                       * max(0, min(small[3], big[3]) - max(small[1], big[1])))
+            if area(big) > area(small) and overlap >= 0.7 * area(small):
+                nested.append(small)
+                break
+    return [b for b in boxes if b not in nested]
+
+
 def refine_red_cells(img, cells):
     """
     Take YOLO's cells and return a corrected list:
@@ -131,7 +148,7 @@ def refine_red_cells(img, cells):
     typical = np.median([area(c["box"]) for c in yolo_rbc])
     mask_cells = [(int(x1 * sx), int(y1 * sy), int(x2 * sx), int(y2 * sy))
                   for x1, y1, x2, y2 in split_cells(mask)]
-    mask_cells = [b for b in mask_cells if area(b) >= MIN_SIZE * typical]
+    mask_cells = remove_nested([b for b in mask_cells if area(b) >= MIN_SIZE * typical])
 
     refined = []
     for y in yolo_rbc:
