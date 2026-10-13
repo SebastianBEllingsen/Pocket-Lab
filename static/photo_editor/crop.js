@@ -2,14 +2,24 @@ let isDragging = false;
 let activeHandle = null;
 
 function startCrop() {
-    const image = document.getElementById("editorImage");
-    const overlay = document.getElementById("cropOverlay");
+
+    const image =
+        document.getElementById("editorImage");
+
+    const overlay =
+        document.getElementById("cropOverlay");
 
     if (image.style.display === "none") {
         showNotification("Open an image first");
         return;
     }
 
+    // Try to activate Crop tool
+    if (!activateTool("crop")) {
+        return;
+    }
+
+    // Show crop overlay
     overlay.style.display = "block";
 
     overlay.style.left = "10%";
@@ -17,7 +27,11 @@ function startCrop() {
     overlay.style.width = "80%";
     overlay.style.height = "80%";
 
-    document.querySelector(".crop-actions").style.display = "flex";
+    document
+        .querySelector(".crop-actions")
+        .style.display = "flex";
+
+    showNotification("Crop tool activated");
 }
 
 
@@ -176,9 +190,10 @@ async function applyCrop() {
 
         showNotification("Image cropped successfully");
 
-    } else {
+    // Release Crop tool
+    deactivateTool("crop");
 
-        showNotification(data.message);
+    showNotification("Image cropped successfully");
     }
 }
 
@@ -190,5 +205,7 @@ function cancelCrop() {
 
     document.querySelector(".crop-actions").style.display = "none";
 
+    // Release Crop tool
+    deactivateTool("crop");
     showNotification("Crop cancelled");
 }

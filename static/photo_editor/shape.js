@@ -21,6 +21,12 @@ function startShape(shape) {
         return;
     }
 
+    // Try to activate Shape tool
+    if (!activateTool("shape")) {
+        return;
+    }
+    document.getElementById("shapesMenu").classList.remove("show");
+
     currentShape = shape;
     shapeMode = true;
 
@@ -341,7 +347,7 @@ function cancelShape() {
     shapeMode = false;
     isDrawingShape = false;
     currentShape = null;
-
+    deactivateTool("shape");
 
     const image =
         document.getElementById("editorImage");
@@ -557,6 +563,7 @@ async function applyShape() {
         isDrawingShape = false;
         currentShape = null;
 
+        deactivateTool("shape");
 
         image.style.cursor =
             "default";

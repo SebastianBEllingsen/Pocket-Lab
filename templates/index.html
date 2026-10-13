@@ -86,9 +86,6 @@
             T Text
         </button>
 
-        <button onclick="deactivateZoom(); sendAction('/contour')">
-            ✎ Draw
-        </button>
 
          <!-- Shapes dropdown -->
 
@@ -175,22 +172,19 @@
 
 
             </div>
-
-
             <!-- Selected image -->
 
-             <div class="image-wrapper">
+<div class="image-wrapper">
 
-        <img
+    <img
             id="editorImage"
             class="editor-image"
             alt="Selected microscope image"
             style="display: none;"
         >
-                 <canvas id="shapeCanvas"></canvas>
+        <canvas id="shapeCanvas"></canvas>
 
         <div id="cropOverlay" class="crop-overlay">
-
             <div class="crop-handle top"></div>
             <div class="crop-handle bottom"></div>
             <div class="crop-handle left"></div>
@@ -198,24 +192,15 @@
 
         </div>
 
-                 <div class="crop-actions">
-                    <button id="applyCropButton" onclick="applyCrop()">
-                        ✓ Apply Crop
-                    </button>
 
-                    <button id="cancelCropButton" onclick="cancelCrop()">
-                        ✕ Cancel
-                    </button>
-                 </div>
-
-           <div
-                id="textInputBox"
-                class="text-input-box"
+    <div
+            id="textInputBox"
+            class="text-input-box"
             >
-                <textarea
-                    id="textInput"
-                    placeholder="Write text..."
-                    rows="1"
+        <textarea
+                id="textInput"
+                placeholder="Write text..."
+                rows="1"
                 ></textarea>
 
                 <div
@@ -223,26 +208,30 @@
                     class="text-resize-handle"
                 ></div>
             </div>
-
-                 <div id="shapeActions" class="shape-actions">
-
-            <button
+    <div id="shapeActions" class="shape-actions">
+        <button
                 id="applyShapeButton"
                 onclick="applyShape()"
-            >
-                ✓ Apply
+        >
+            ✓ Apply
             </button>
-
-            <button
+        <button
                 id="cancelShapeButton"
                 onclick="cancelShape()"
-            >
-                ✕ Cancel
-            </button>
+        >
+            ✕ Cancel
+        </button>
+    </div>
+</div>
+            <div class="crop-actions">
+        <button id="applyCropButton" onclick="applyCrop()">
+            ✓ Apply Crop
+        </button>
 
-        </div>
-
-                </div>
+        <button id="cancelCropButton" onclick="cancelCrop()">
+            ✕ Cancel
+        </button>
+             </div>
 
         </div>
 
@@ -500,6 +489,7 @@
 <script src="{{ url_for('static', filename='photo_editor/text.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/save.js') }}"></script>
 <script src="{{ url_for('static', filename='photo_editor/shape.js') }}"></script>
+<script src="{{ url_for('static', filename='photo_editor/tool.js') }}"></script>
 
 </body>
 
