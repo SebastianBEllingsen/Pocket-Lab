@@ -21,6 +21,10 @@ function startText() {
         return;
     }
 
+    if (!activateTool("text")) {
+        return;
+    }
+
     // Activate text mode
     textModeActive = true;
 
@@ -28,7 +32,8 @@ function startText() {
 
     showNotification("Click on the image to add text");
 
-    image.addEventListener("click", textImageClick);
+    image.addEventListener("click", textImageClick, { once: true }
+    );
 }
 
 
@@ -291,6 +296,8 @@ async function applyText() {
         if (data.success) {
 
             textModeActive = false;
+            deactivateTool("text");
+
             image.removeEventListener("click", textImageClick);
             image.src =
                 data.image_url +
@@ -345,6 +352,7 @@ function cancelText() {
 
     // Deactivate text mode
     textModeActive = false;
+    deactivateTool("text");
 
     // Remove click listener
     image.removeEventListener("click", textImageClick);
