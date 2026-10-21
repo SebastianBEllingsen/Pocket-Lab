@@ -22,7 +22,7 @@ Outputs
 import argparse, csv, hashlib, os
 import cv2
 import numpy as np
-from count_cells import process, circle_mask, R_CANON
+from count_cells import process, count_masks
 
 CLASSES = ["rbc", "wbc", "platelet", "smudge"]
 COLORS = [(0, 200, 0), (255, 60, 0), (0, 140, 255), (200, 0, 200)]
@@ -51,6 +51,9 @@ def main():
     ap.add_argument("--test", type=float, default=0.1)
     ap.add_argument("--split", nargs="*", default=None,
                     help="explicit name=split pairs, e.g. img3=val img5=test")
+    ap.add_argument("--no-fov", action="store_true", help="plain crops without an eyepiece circle")
+    ap.add_argument("--rbc-radius", type=float, default=None,
+                    help="RBC radius in raw px, used if too few round cells are found")
     a = ap.parse_args()
     forced = dict(p.split("=") for p in (a.split or []))
     for sub in ("images", "labels"):
@@ -65,11 +68,13 @@ def main():
         name = os.path.splitext(os.path.basename(path))[0]
         slide = name.split("_")[0]          # S07_100x_f12 -> S07: whole slide in one split
         sp = forced.get(name) or forced.get(slide) or split_of(slide, a.val, a.test)
-        row, nrm, dets, review = process(path, tmp, return_dets=True)
+        row, nrm, dets, review = process(path, tmp, return_dets=True,
+            has_fov=False if a.no_fov else None,
+            rbc_radius=a.rbc_radius)
         img = nrm["img"].copy()
         H, W = img.shape[:2]
-        inner = circle_mask(img.shape, nrm["cx"], nrm["cy"], nrm["Rf"] - R_CANON)
-        img[inner == 0] = 0                                  # hide unlabelled rim
+        _, inner = count_masks(nrm)
+        img[inner == 0] = 0                                  # hide unlabelled rim (none on plain crops)
         for x0, y0, x1, y1, missing in review:
             review_rows.append(dict(image=name, x1=x0, y1=y0, x2=x1, y2=y1,
                                     missing_rbc_boxes=missing, split=sp))
@@ -87,6 +92,9 @@ def main():
             tile = img[ty:ty + TILE, tx:tx + TILE]
             if (tile.max(axis=2) > 0).mean() < 0.25:         # mostly outside FOV
                 continue
+            if tile.shape[:2] != (TILE, TILE):               # image smaller than a tile: pad
+                tile = cv2.copyMakeBorder(tile, 0, TILE - tile.shape[0], 0, TILE - tile.shape[1],
+                                          cv2.BORDER_CONSTANT, value=0)
             lines = []
             for c, (x0, y0, x1, y1) in zip(cls, d):
                 cx0, cy0 = max(x0, tx), max(y0, ty)

@@ -17,7 +17,7 @@ import numpy as np
 import torch
 from torchvision.ops import batched_nms
 from ultralytics import YOLO
-from count_cells import normalise, circle_mask, R_CANON
+from count_cells import normalise, count_masks
 
 TILE, STRIDE = 640, 512
 COLORS = [(0, 200, 0), (255, 60, 0), (0, 140, 255), (200, 0, 200)]
@@ -31,11 +31,11 @@ def tile_origins(W, H):
     return [(x, y) for y in ys for x in xs]
 
 
-def count_image(model, path, out_dir, conf):
-    nrm = normalise(cv2.imread(path))
+def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
+    nrm = normalise(cv2.imread(path), has_fov, rbc_radius)
     img = nrm["img"].copy()
     H, W = img.shape[:2]
-    inner = circle_mask(img.shape, nrm["cx"], nrm["cy"], nrm["Rf"] - R_CANON)
+    _, inner = count_masks(nrm)
     img[inner == 0] = 0
     boxes, scores, classes = [], [], []
     origins = [(x, y) for x, y in tile_origins(W, H)
@@ -81,10 +81,14 @@ if __name__ == "__main__":
     ap.add_argument("--weights", required=True)
     ap.add_argument("--out", default="results_yolo")
     ap.add_argument("--conf", type=float, default=0.25)
+    ap.add_argument("--no-fov", action="store_true", help="plain crops without an eyepiece circle")
+    ap.add_argument("--rbc-radius", type=float, default=None,
+                    help="RBC radius in raw px, used if too few round cells are found")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     model = YOLO(a.weights)
-    rows = [count_image(model, p, a.out, a.conf) for p in a.images]
+    rows = [count_image(model, p, a.out, a.conf, False if a.no_fov else None, a.rbc_radius)
+            for p in a.images]
     with open(os.path.join(a.out, "counts_yolo.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=rows[0].keys())
         w.writeheader()

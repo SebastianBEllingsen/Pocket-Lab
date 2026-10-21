@@ -37,7 +37,7 @@ from scipy import ndimage as ndi
 
 R_CANON = 16.0                      # RBC radius after rescaling (px)
 A_RBC = np.pi * R_CANON ** 2        # one RBC area in canonical px
-
+MIN_ROUND_BLOBS = 5
 
 # ----------------------------------------------------------------- helpers
 def find_fov(img):
@@ -74,10 +74,12 @@ def foreground(img, fov):
                          cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     m = ((d > 0.6 * t) & (fov > 0)).astype(np.uint8) * 255   # 0.6: keep pale rims
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-    H, W = m.shape
-    ff = m.copy()
+    # fill holes (pallor): flood the background from a 1 px empty border, so it
+    # also works when a cell touches the image corner (plain crops)
+    ff = cv2.copyMakeBorder(m, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+    H, W = ff.shape
     cv2.floodFill(ff, np.zeros((H + 2, W + 2), np.uint8), (0, 0), 255)
-    m |= cv2.bitwise_not(ff)                           # fill holes (pallor)
+    m |= cv2.bitwise_not(ff[1:-1, 1:-1])
     return m
 
 
@@ -96,30 +98,69 @@ def round_blob_radii(mask):
 
 
 # ----------------------------------------------------------------- main step
-def normalise(raw):
-    """Find the FOV, measure the RBC radius and rescale so RBC radius == R_CANON.
+def has_eyepiece_fov(raw):
+    """True if the photo shows the dark rim of an eyepiece. Plain rectangular
+    crops (public datasets) have almost no pixels darker than 60."""
+    gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
+    return (gray < 60).mean() >= 0.05
+
+
+def normalise(raw, has_fov=None, rbc_radius=None):
+    """Find the field of view, measure the RBC radius and rescale so RBC radius == R_CANON.
     Shared by the classical counter, the YOLO dataset builder and YOLO inference,
-    so the network always sees cells at the same size."""
-    cx, cy, R = find_fov(raw)
-    s1 = 800.0 / R
-    im1 = cv2.resize(raw, None, fx=s1, fy=s1, interpolation=cv2.INTER_AREA)
-    fov1 = circle_mask(im1.shape, cx * s1, cy * s1, 0.93 * 800)
+    so the network always sees cells at the same size.
+
+    has_fov    : True = eyepiece photo, False = plain crop, None = detect automatically
+    rbc_radius : RBC radius in px of the RAW image; used only when fewer than
+                 MIN_ROUND_BLOBS isolated round cells are found"""
+    if has_fov is None:
+        has_fov = has_eyepiece_fov(raw)
+    if has_fov:
+        cx, cy, R = find_fov(raw)
+        s1 = 800.0 / R
+        im1 = cv2.resize(raw, None, fx=s1, fy=s1, interpolation=cv2.INTER_AREA)
+        fov1 = circle_mask(im1.shape, cx * s1, cy * s1, 0.93 * 800)
+    else:                                       # the whole image is the field
+        s1 = min(1.0, 1600.0 / max(raw.shape[:2]))   # only shrink very large crops
+        im1 = cv2.resize(raw, None, fx=s1, fy=s1, interpolation=cv2.INTER_AREA) if s1 < 1 else raw
+        fov1 = np.full(im1.shape[:2], 255, np.uint8)
     m1 = cv2.morphologyEx(foreground(im1, fov1), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-    r_est = float(np.median(round_blob_radii(m1)))
+    radii = round_blob_radii(m1)
+    if len(radii) >= MIN_ROUND_BLOBS:
+        r_est = float(np.median(radii))
+    elif rbc_radius:
+        r_est = rbc_radius * s1
+    else:
+        raise ValueError(f"only {len(radii)} round red cells found; pass --rbc-radius "
+                         "(RBC radius in px of the original image)")
     s = s1 * R_CANON / r_est
     img = cv2.resize(raw, None, fx=s, fy=s,
                      interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
-    cx, cy, Rf = cx * s, cy * s, 0.93 * R * s
-    return dict(img=img, scale=s, cx=cx, cy=cy, Rf=Rf, rbc_radius_px=r_est / s1)
+    if has_fov:
+        cx, cy, Rf = cx * s, cy * s, 0.93 * R * s
+    else:
+        cx, cy, Rf = img.shape[1] / 2, img.shape[0] / 2, None
+    return dict(img=img, scale=s, cx=cx, cy=cy, Rf=Rf, has_fov=has_fov,
+                rbc_radius_px=r_est / s1)
 
 
-def process(path, out_dir, return_dets=False):
+def count_masks(nrm):
+    """(field, counted) masks for a normalised image. field = pixels on the slide,
+    counted = where a cell centre must lie to be counted or labelled.
+    Plain crops have no rim, so both are the whole image."""
+    shape = nrm["img"].shape
+    if not nrm["has_fov"]:
+        full = np.full(shape[:2], 255, np.uint8)
+        return full, full.copy()
+    return (circle_mask(shape, nrm["cx"], nrm["cy"], nrm["Rf"]),
+            circle_mask(shape, nrm["cx"], nrm["cy"], nrm["Rf"] - R_CANON))
+
+def process(path, out_dir, return_dets=False, has_fov=None, rbc_radius=None):
     raw = cv2.imread(path)
-    nrm = normalise(raw)
+    nrm = normalise(raw, has_fov, rbc_radius)
     img, s, cx, cy, Rf = nrm["img"], nrm["scale"], nrm["cx"], nrm["cy"], nrm["Rf"]
     H, W = img.shape[:2]
-    fov = circle_mask(img.shape, cx, cy, Rf)
-    inner = circle_mask(img.shape, cx, cy, Rf - R_CANON)   # count only fully visible cells
+    fov, inner = count_masks(nrm)  
 
     # 3. colour relative to background
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
@@ -232,7 +273,8 @@ def process(path, out_dir, return_dets=False):
         cv2.circle(vis, (int(x), int(y)), int(R_CANON * 0.6), (0, 140, 255), 3)
     for x, y, a, b in smudge:
         cv2.rectangle(vis, (b[0], b[1]), (b[0] + b[2], b[1] + b[3]), (200, 0, 200), 5)
-    cv2.circle(vis, (int(cx), int(cy)), int(Rf - R_CANON), (0, 0, 255), 2)
+    if nrm["has_fov"]:
+        cv2.circle(vis, (int(cx), int(cy)), int(Rf - R_CANON), (0, 0, 255), 2)
     fs = W / 1100
     cv2.putText(vis, f"RBC {rbc_total}  WBC {len(wbc)}  PLT {len(plt)}  smudge {len(smudge)}",
                 (int(W * 0.02), int(H * 0.06)), cv2.FONT_HERSHEY_SIMPLEX, fs,
@@ -255,9 +297,13 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("images", nargs="+")
     ap.add_argument("--out", default="results")
+    ap.add_argument("--no-fov", action="store_true", help="plain crops without an eyepiece circle")
+    ap.add_argument("--rbc-radius", type=float, default=None,
+                    help="RBC radius in raw px, used if too few round cells are found")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
-    rows = [process(p, a.out) for p in a.images]
+    rows = [process(p, a.out, has_fov=False if a.no_fov else None, rbc_radius=a.rbc_radius)
+            for p in a.images]
     with open(os.path.join(a.out, "counts.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=rows[0].keys())
         w.writeheader()
