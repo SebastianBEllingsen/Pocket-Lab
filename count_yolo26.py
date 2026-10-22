@@ -1,23 +1,11 @@
-"""
-Count blood cells in new smear photos with a trained YOLO26 model.
-
-    python count_yolo26.py new_images/*.jpg --weights runs/detect/bloodcells/weights/best.pt
-
-Steps per image
-  1. normalise(): same FOV detection + rescaling as during training (RBC radius 16 px)
-  2. black out the rim outside the counted area (same as training)
-  3. tiled inference: 640x640 tiles, stride 512
-  4. merge tiles: map boxes back to the full image, class-wise NMS removes
-     duplicates from overlapping tiles
-  5. count per class, write <out>/counts_yolo.csv and annotated images
-"""
 import argparse, csv, os
 import cv2
 import numpy as np
 import torch
 from torchvision.ops import batched_nms
+from skimage.filters import apply_hysteresis_threshold
 from ultralytics import YOLO
-from count_cells import normalise, count_masks
+from count_cells import normalise, count_masks, circle_mask, R_CANON, flat_background, A_RBC
 
 TILE, STRIDE = 640, 512
 COLORS = [(0, 200, 0), (255, 60, 0), (0, 140, 255), (200, 0, 200)]
@@ -30,6 +18,43 @@ def tile_origins(W, H):
     if ys[-1] + TILE < H: ys.append(H - TILE)
     return [(x, y) for y in ys for x in xs]
 
+def stain_maps(img, field):
+    """Same purple-stain measures as count_cells.process(): darkness relative to the
+    glass (dL), dark-nucleus seeds (strong) and the stained-object mask (stain)."""
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    L = lab[..., 0].astype(np.float32)
+    ps = lab[..., 1].astype(np.float32) - lab[..., 2].astype(np.float32)
+    dL = L - flat_background(lab[..., 0]).astype(np.float32)
+    bg_sel = (L > np.percentile(L[field > 0], 85)) & (field > 0)
+    score = ps - np.median(ps[bg_sel])
+    strong = (score > 40) & (dL < -75) & (field > 0)
+    weak = (score > 30) & (field > 0)
+    stain = (apply_hysteresis_threshold(score * weak, 30, 40) & weak).astype(np.uint8) * 255
+    stain = cv2.morphologyEx(stain, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    stain = cv2.morphologyEx(stain, cv2.MORPH_CLOSE,
+                             cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (13, 13)))
+    return dL, strong, stain
+
+
+def relabel_smudge(nrm, b, c, names):
+    """Stage A never saw a smudge cell, so it calls them WBC. Check each WBC box with
+    the classical rule: a WBC has a dark nucleus; a large pale purple blob is smudge."""
+    ids = {v: k for k, v in names.items()}
+    field, _ = count_masks(nrm)
+    dL, strong, stain = stain_maps(nrm["img"], field)
+    c = c.copy()
+    for j in np.flatnonzero(c == ids["wbc"]):
+        x0, y0, x1, y1 = np.maximum(b[j], 0).astype(int)
+        n, lbl, st, _ = cv2.connectedComponentsWithStats(stain[y0:y1, x0:x1])
+        if n < 2:
+            continue
+        i = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))      # biggest stained blob in the box
+        sel, a = lbl == i, st[i, cv2.CC_STAT_AREA]
+        is_wbc = (a >= 0.8 * A_RBC and strong[y0:y1, x0:x1][sel].any()
+                  and dL[y0:y1, x0:x1][sel].mean() < -78)
+        if not is_wbc and a >= 2.0 * A_RBC:
+            c[j] = ids["smudge"]
+    return c
 
 def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
     nrm = normalise(cv2.imread(path), has_fov, rbc_radius)
@@ -66,6 +91,7 @@ def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
     cys = ((b[:, 1] + b[:, 3]) / 2).astype(int).clip(0, H - 1)
     ok = inner[cys, cxs] > 0
     b, c = b[ok], c[ok]
+    c = relabel_smudge(nrm, b, c, model.names)
     names = model.names
     counts = {names[k]: int((c == k).sum()) for k in names}
     vis = img.copy()
