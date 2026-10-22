@@ -23,12 +23,18 @@ ap.add_argument("--imgsz", type=int, default=640)
 ap.add_argument("--batch", type=int, default=16)     # -1 = auto for GPU memory
 ap.add_argument("--device", default=None)            # 0, "cpu", "mps"
 ap.add_argument("--name", default="bloodcells")
+ap.add_argument("--optimizer", default="auto")       # "auto" IGNORES lr0 -> use SGD with --lr0
+ap.add_argument("--lr0", type=float, default=None)   # None = Ultralytics default (0.01 for SGD)
+ap.add_argument("--patience", type=int, default=40)
 a = ap.parse_args()
+if a.lr0 is not None and a.optimizer == "auto":
+    raise SystemExit("--lr0 has no effect with --optimizer auto; add --optimizer SGD")
 
 model = YOLO(a.model)                                # pretrained COCO weights
 model.train(
     data=a.data, epochs=a.epochs, imgsz=a.imgsz, batch=a.batch, device=a.device,
-    name=a.name, patience=40, seed=0,
+    name=a.name, patience=a.patience, seed=0, exist_ok=True, optimizer=a.optimizer,
+    **({} if a.lr0 is None else {"lr0": a.lr0}),
     # geometry: cells have no "up", tiles are already at a fixed scale
     degrees=90, flipud=0.5, fliplr=0.5, scale=0.15, translate=0.1,
     mosaic=1.0, close_mosaic=15,
@@ -38,4 +44,5 @@ model.train(
 )
 metrics = model.val(data=a.data, split="test", max_det=1000)
 print("test mAP50-95:", metrics.box.map, " mAP50:", metrics.box.map50)
-print("per-class mAP50-95:", dict(zip(model.names.values(), metrics.box.maps)))
+present = metrics.box.ap_class_index            # classes that actually occur in the test split
+print("per-class mAP50-95:", {model.names[int(i)]: round(float(metrics.box.maps[i]), 3) for i in present})

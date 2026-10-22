@@ -45,10 +45,14 @@ def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
         results = model.predict(crops[i:i + 8], imgsz=TILE, conf=conf,
                                 max_det=1000, verbose=False)
         for (x, y), r in zip(origins[i:i + 8], results):
-            b = r.boxes.xyxy.cpu().numpy() + [x, y, x, y]
-            boxes.append(b)
-            scores.append(r.boxes.conf.cpu().numpy())
-            classes.append(r.boxes.cls.cpu().numpy().astype(int))
+            b = r.boxes.xyxy.cpu().numpy()
+            # A box touching an inner tile edge is a cut-off cell: the neighbouring tile
+            # overlaps by 128 px (more than any cell) and sees the whole cell, so drop it.
+            cut = (((b[:, 0] <= 2) & (x > 0)) | ((b[:, 1] <= 2) & (y > 0)) |
+                   ((b[:, 2] >= TILE - 2) & (x + TILE < W)) | ((b[:, 3] >= TILE - 2) & (y + TILE < H)))
+            boxes.append(b[~cut] + [x, y, x, y])
+            scores.append(r.boxes.conf.cpu().numpy()[~cut])
+            classes.append(r.boxes.cls.cpu().numpy().astype(int)[~cut])
     if boxes:
         b = torch.tensor(np.concatenate(boxes), dtype=torch.float32)
         s = torch.tensor(np.concatenate(scores), dtype=torch.float32)
