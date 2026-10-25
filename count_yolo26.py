@@ -56,8 +56,9 @@ def relabel_smudge(nrm, b, c, names):
             c[j] = ids["smudge"]
     return c
 
-def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
-    nrm = normalise(cv2.imread(path), has_fov, rbc_radius)
+def detect(model, nrm, conf, smudge_check=True):
+    """Tiled YOLO26 inference on a normalised image. Returns boxes (N x 4, normalised px)
+    and class ids of the cells whose centre lies inside the counted area."""
     img = nrm["img"].copy()
     H, W = img.shape[:2]
     _, inner = count_masks(nrm)
@@ -91,7 +92,18 @@ def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
     cys = ((b[:, 1] + b[:, 3]) / 2).astype(int).clip(0, H - 1)
     ok = inner[cys, cxs] > 0
     b, c = b[ok], c[ok]
-    c = relabel_smudge(nrm, b, c, model.names)
+    if smudge_check:
+        c = relabel_smudge(nrm, b, c, model.names)
+    return b, c
+
+
+def count_image(model, path, out_dir, conf, has_fov=None, rbc_radius=None):
+    nrm = normalise(cv2.imread(path), has_fov, rbc_radius)
+    b, c = detect(model, nrm, conf)
+    img = nrm["img"].copy()
+    H, W = img.shape[:2]
+    _, inner = count_masks(nrm)
+    img[inner == 0] = 0
     names = model.names
     counts = {names[k]: int((c == k).sum()) for k in names}
     vis = img.copy()
