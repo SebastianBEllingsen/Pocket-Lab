@@ -51,6 +51,8 @@ def main():
     ap.add_argument("--test", type=float, default=0.1)
     ap.add_argument("--split", nargs="*", default=None,
                     help="explicit name=split pairs, e.g. img3=val img5=test")
+    ap.add_argument("--exclude", nargs="*", default=[],
+                    help="photo names to leave out, e.g. unk_40x_04 (normalisation failed)")
     ap.add_argument("--no-fov", action="store_true", help="plain crops without an eyepiece circle")
     ap.add_argument("--rbc-radius", type=float, default=None,
                     help="RBC radius in raw px, used if too few round cells are found")
@@ -66,11 +68,18 @@ def main():
     review_rows, stats = [], {sp: [0, 0] for sp in ("train", "val", "test")}
     for path in a.images:
         name = os.path.splitext(os.path.basename(path))[0]
+        if name in a.exclude:
+            print(f"{name}: EXCLUDED")
+            continue
         slide = name.split("_")[0]          # S07_100x_f12 -> S07: whole slide in one split
         sp = forced.get(name) or forced.get(slide) or split_of(slide, a.val, a.test)
-        row, nrm, dets, review = process(path, tmp, return_dets=True,
-            has_fov=False if a.no_fov else None,
-            rbc_radius=a.rbc_radius)
+        try:
+            row, nrm, dets, review = process(path, tmp, return_dets=True,
+                has_fov=False if a.no_fov else None,
+                rbc_radius=a.rbc_radius)
+        except ValueError as e:             # normalisation failed: too few round red cells
+            print(f"{name}: SKIPPED ({e})")
+            continue
         img = nrm["img"].copy()
         H, W = img.shape[:2]
         _, inner = count_masks(nrm)

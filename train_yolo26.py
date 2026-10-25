@@ -23,6 +23,8 @@ ap.add_argument("--imgsz", type=int, default=640)
 ap.add_argument("--batch", type=int, default=16)     # -1 = auto for GPU memory
 ap.add_argument("--device", default=None)            # 0, "cpu", "mps"
 ap.add_argument("--name", default="bloodcells")
+ap.add_argument("--eval-split", default="test",
+                help="split for the final score; use val while test labels are drafts")
 ap.add_argument("--optimizer", default="auto")       # "auto" IGNORES lr0 -> use SGD with --lr0
 ap.add_argument("--lr0", type=float, default=None)   # None = Ultralytics default (0.01 for SGD)
 ap.add_argument("--patience", type=int, default=40)
@@ -42,7 +44,7 @@ model.train(
     hsv_h=0.03, hsv_s=0.6, hsv_v=0.4,
     max_det=1000,                                    # a tile can hold ~400 RBCs
 )
-metrics = model.val(data=a.data, split="test", max_det=1000)
-print("test mAP50-95:", metrics.box.map, " mAP50:", metrics.box.map50)
+metrics = model.val(data=a.data, split=a.eval_split, max_det=1000)
+print(f"{a.eval_split} mAP50-95:", metrics.box.map, " mAP50:", metrics.box.map50)
 present = metrics.box.ap_class_index            # classes that actually occur in the test split
 print("per-class mAP50-95:", {model.names[int(i)]: round(float(metrics.box.maps[i]), 3) for i in present})
