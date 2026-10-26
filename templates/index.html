@@ -320,11 +320,18 @@
                 🔴 Count Red Cells
             </button>
 
-            <button
+                        <button
                 class="analysis-button white-button"
                 onclick="countCells('/count-white', 'white-count')"
             >
                 ⚪ Count White Cells
+            </button>
+
+            <button
+                class="analysis-button"
+                onclick="countAll()"
+            >
+                🔬 Count All Cells
             </button>
 
 
@@ -349,6 +356,29 @@
                         --
                     </strong>
                 </div>
+
+                <div>
+                    <span>
+                        Platelets
+                    </span>
+
+                    <strong id="platelet-count">
+                        --
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        Smudge Cells
+                    </span>
+
+                    <strong id="smudge-count">
+                        --
+                    </strong>
+                </div>
+
+                <!-- White cell types, e.g. "2 neutrophil, 1 lymphocyte" -->
+                <p id="white-types"></p>
 
             </div>
 

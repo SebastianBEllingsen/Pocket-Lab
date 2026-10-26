@@ -66,6 +66,57 @@ async function countCells(url, resultElement) {
 
         document.getElementById(resultElement).textContent =
             data.count;
+        
+        // Count White also sends the white cell types
+        if (data.types !== undefined) {
+            document.getElementById("white-types").textContent =
+                data.types;
+        }
+
+        showNotification(data.message);
+
+    } catch (error) {
+
+        console.error(error);
+
+        showNotification("Counting failed.");
+
+    }
+}
+
+
+
+// ------------------------------------
+// Count all cell types at once
+// ------------------------------------
+
+async function countAll() {
+
+    try {
+
+        const response = await fetch("/count-all", {
+            method: "POST"
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+
+            document.getElementById("red-count").textContent =
+                data.counts.rbc;
+
+            document.getElementById("white-count").textContent =
+                data.counts.wbc;
+
+            document.getElementById("platelet-count").textContent =
+                data.counts.platelet;
+
+            document.getElementById("smudge-count").textContent =
+                data.counts.smudge;
+
+            document.getElementById("white-types").textContent =
+                data.types;
+        }
 
         showNotification(data.message);
 

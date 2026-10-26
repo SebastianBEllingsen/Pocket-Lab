@@ -12,6 +12,7 @@ from processing.shape import (
 )
 import cv2
 import os
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -573,9 +574,28 @@ def count_red():
     return count_response("rbc", "red blood cells")
 
 
+def type_summary(result):
+    """White cell types of the image, e.g. '2 neutrophil, 1 lymphocyte'."""
+    return ", ".join(
+        f"{n} {t}" for t, n in Counter(result["wbc_types"]).most_common()
+    )
+
+
 @app.route("/count-white", methods=["POST"])
 def count_white():
-    return count_response("wbc", "white blood cells")
+    result, error = get_analysis()
+    if error is not None:
+        return error
+
+    count = result["counts"]["wbc"]
+    types = type_summary(result)
+
+    return jsonify({
+        "success": True,
+        "count": count,
+        "types": types,
+        "message": f"Found {count} white blood cells" + (f": {types}" if types else "")
+    })
 
 
 @app.route("/count-all", methods=["POST"])
