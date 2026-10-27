@@ -33,6 +33,14 @@
 - 2026-10-11: PBC (Data_Set_3) added with a `pbc`/`3` loader; image content and counts in DATASETS.md.
 - 2026-10-11: Git: local commits only, never push; data, runs and weights are ignored.
 
+### Decision record: threshold picker and eyepiece circle (2026-10-27, verdict pending)
+- Problem (Sebastian saw it on BCCD/PBC/Data_Set_1): cells marked as open donuts, edges missed, some cells not marked. Cause: one global Otsu cut-off on the Lab distance map; a small dark region (WBC nucleus) pulls it up, so pale RBCs fall below it.
+- Options (flag `--threshold`): `otsu` (old), `half` (0.5 x Otsu), `lower` (Otsu on the values below the first cut-off), `clipped` (Otsu after clipping at the median of the dark values). Several names after `--threshold` give a side-by-side comparison.
+- Evidence: on PBC and BCCD images `half` and `lower` outline every RBC closed and filled, `otsu` gives donuts and misses. On Data_Set_1 (30 images, scratch test) mean IoU otsu 0.888, half 0.836, lower 0.790, because the reference mask omits ghosts and dust (label-policy gap, see above). On the own phone photos (cells faint, strong vignette) all pickers are poor: `otsu` marks mostly WBCs, `lower` marks the vignetted edge. Default stays `otsu` until Sebastian judges.
+- Own photos: dark rim around a bright circle made the rim win the background vote. New `--fov auto` finds the circle (robust least-squares fit) and works inside it; the mask is cut to the circle, matching the detector's rim convention. Circle found on 60 of 63 photos at first, 62 of 63 after lowering the grey cut to 0.25 x Otsu; no false circles on 21 images each from Data_Set_1 and BCCD. Known issue: fitted circle bulges a few px on `unk_40x_06`.
+- Consequence for the generator: the own photos have no cell-free glass, so backgrounds for them must come from the stage-1 background field estimate, not from cell-free patches.
+- Reproduce: `python -m cellcount.bg_removal --dataset 3 --random 4 --threshold otsu,half,lower`; `python -m cellcount.bg_removal --image Data_Sets/own_v2/own_v2/unk_100x_05.jpg --threshold otsu,half,lower`.
+
 ## Open questions
 - Overlap idea as training-data preprocessing vs. an inference-time step (discussed; leaning: build and validate the splitter first, then decide; BCCD boxes and synthetic data give the validation).
 - Data_Set_2 classification split leakage: check was inconclusive, see DATASETS.md. Decide whether to build our own split by BCCD original.
