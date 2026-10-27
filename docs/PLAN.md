@@ -16,7 +16,24 @@ From a blood smear image, count cells, classify red vs. white, then classify whi
 - Synthetic compositing: paste cut-out single cells onto backgrounds at random positions, rotations and zooms. Ground truth is exact, including overlap counts. See IDEAS.md.
 - Always keep some real full-field images as the final honest test.
 
-## Roadmap
+## Revised scope and roadmap (2026-10-27)
+Scope: this part produces synthetic training data only; a teammate trains and evaluates the detector (his code: branch `origin/cell-detection-v2`, YOLO26, real test crops with hand labels). Roadmap below this section is the original plan; items on classification, method comparison and end-to-end evaluation are out of scope here.
+
+Output contract (to confirm against the teammate's final class list):
+- YOLO txt labels, 640x640 tiles, `data.yaml`, `images|labels/{train,val,test}`; synthetic data goes into `train` only.
+- Scale: RBC radius 16 px (the teammate normalises all real images to this before detection).
+- Classes: rbc, platelet, smudge, plus the 7 WBC types basophil, eosinophil, erythroblast, ig, lymphocyte, monocyte, neutrophil (the 7 non-platelet PBC classes). Exact names and order: to be confirmed with the teammate.
+- Target look: own eyepiece/phone photos at 40x and 100x (yellow, pink or white backgrounds, white-balance spread, optional eyepiece rim). Real photos not on this machine yet; Sebastian can get them.
+
+Revised steps:
+- [~] A. Stage 1 background removal (built, verdict pending): used to cut out cells and to find cell-free backgrounds.
+- [ ] B. Cut-out bank: RBC (Data_Set_1 isolated cells, BCCD), WBC and platelet (PBC, class kept), smudge (synthesised pale or broken blobs), cell-free backgrounds. Each cut-out stored with mask and source class; rescaled to RBC radius 16 px.
+- [ ] C. Generator v1: random placement, rotation, optical-density blending for overlaps, soft alpha edges, border cells, class ratios, exact boxes. CLI with seed.
+- [ ] D. Realism: white-balance and stain re-tint, blur, noise, JPEG artefacts, vignette, optional eyepiece rim.
+- [ ] E. Export in the teammate's format, previews for Sebastian to check, hand-over notes.
+- [ ] F. Check with the teammate whether the synthetic data helps on his real test crops; tune generator from that.
+
+## Roadmap (original, 2026-10-11)
 - [x] 0. Inspect datasets (done 2026-10-11, see DATASETS.md). PBC added as Data_Set_3. Still to do: check/replace the Data_Set_2 classification split (leakage question), look for more full-field data.
 - [~] 1. Pre-processing: background removal BUILT, awaiting Sebastian's visual verdict (he is reading the code first); stain normalization not started
 - [ ] 2. Segmentation of cells
