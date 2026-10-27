@@ -14,8 +14,10 @@ Public API
     make_smudge(rng, radius)    procedural pale, ragged smudge cell (a Cutout)
     generate_scene(bank, cfg, rng) -> Scene
 
-Box convention: the tight box around the visible part of a cell (alpha above 0.3), clipped to the
-tile; cells less than half visible or smaller than 6 px are not labelled.
+Box convention (teammate, confirmed 2026-10-27): tight box around the whole cell outline (WBC with cytoplasm,
+platelet around the dot, smudge around the pale patch), clipped to the tile; cells less than half visible or
+smaller than 6 px are not labelled. Rim rule: outside the counting circle (count_frac x eyepiece radius minus one
+red-cell radius) the image is black and only cells whose box centre is inside the circle are labelled.
 """
 from __future__ import annotations
 
@@ -37,8 +39,10 @@ SMUDGE_OD = np.array([0.55, 0.85, 0.65], np.float32)     # purple: absorbs mostl
 class SceneConfig:
     tile: int = 640
     rbc_radius: float = 16.0               # detector's canonical red-cell radius (px)
-    coverage: tuple[float, float] = (0.25, 0.80)   # share of the tile covered by red-cell discs, before overlap
-    min_dist: tuple[float, float] = (0.55, 1.0)    # smallest centre distance, in red-cell diameters (lower = more overlap)
+    coverage: tuple[float, float] = (0.15, 0.65)   # share of the tile covered by red-cell discs, before overlap (random and clumps layouts)
+    min_dist: tuple[float, float] = (0.7, 1.05)    # smallest centre distance, in red-cell diameters (lower = more overlap)
+    layouts: tuple[str, ...] = ("random", "packed", "clumps")   # how red cells are arranged: scattered, tight hexagonal-ish (100x look), small clumps (40x look)
+    layout_weights: tuple[float, ...] = (0.4, 0.25, 0.35)
     size_jitter: float = 0.10              # per-cell size variation
     zoom_jitter: float = 0.08              # per-tile size variation of everything
     wbc_mean: float = 1.5                  # white cells per tile (Poisson mean)
@@ -56,7 +60,9 @@ class SceneConfig:
     pbc_rbc_weight: float = 0.7                    # chance that a scene's red cells come from PBC (pale centre) rather than Data_Set_1
     platelet_radius: tuple[float, float] = (0.2, 0.45)   # platelet radius as a fraction of the red-cell radius
     vignette: tuple[float, float] = (0.0, 0.25)
-    rim_prob: float = 0.15                 # tiles with an eyepiece rim (black outside a circle)
+    rim_prob: float = 0.15                 # tiles that contain the eyepiece edge
+    rim_radius: tuple[float, float] = (0.55, 0.9)   # eyepiece radius as a fraction of the tile
+    count_frac: float = 0.93               # counting circle = this fraction of the eyepiece radius minus one red-cell radius (teammate's rule)
     own_bg_weight: float = 0.7             # chance of a glass field from your own photos
     margin: int = 48                       # canvas margin so cells can be cut by the tile edge
 
@@ -162,17 +168,47 @@ def _glass(bank: Bank, cfg: SceneConfig, rng: np.random.Generator, size: int) ->
     return f * (1 + 0.02 * blot / (blot.std() + 1e-6))[..., None]
 
 
-def _positions(n: int, size: int, min_d: float, rng: np.random.Generator, lo: float, hi: float) -> np.ndarray:
+def _positions(n: int, size: int, min_d: float, rng: np.random.Generator, lo: float, hi: float, sampler=None) -> np.ndarray:
     """Dart throwing: centres at least ``min_d`` apart where possible; a few overlaps are allowed
-    after 30 failed tries so dense scenes still fill up."""
+    after 30 failed tries so dense scenes still fill up. ``sampler`` draws candidates (default uniform)."""
     pts: list[np.ndarray] = []
     for _ in range(n):
         for t in range(30):
-            p = rng.uniform(lo, hi, 2)
+            p = sampler() if sampler else rng.uniform(lo, hi, 2)
             if not pts or np.min(np.hypot(*(np.array(pts) - p).T)) >= min_d:
                 break
         pts.append(p)
     return np.array(pts).reshape(-1, 2)
+
+
+def _packed(size: int, R: float, rng: np.random.Generator) -> np.ndarray:
+    """Jittered hexagonal grid at a random angle and spacing, with random gaps (the 100x look)."""
+    a = 2 * R * rng.uniform(0.95, 1.2)
+    ext = int(size * 0.75 / a) + 3
+    ii, jj = np.meshgrid(np.arange(-ext, ext + 1), np.arange(-ext, ext + 1))
+    pts = np.c_[(ii + 0.5 * (jj % 2)).ravel() * a, (jj * a * np.sqrt(3) / 2).ravel()]
+    t = rng.uniform(0, np.pi)
+    pts = pts @ np.array([[np.cos(t), -np.sin(t)], [np.sin(t), np.cos(t)]]).T + size / 2 + rng.uniform(-a, a, 2)
+    pts += rng.normal(0, 0.12 * R, pts.shape)
+    keep = (pts > -0.5 * R).all(1) & (pts < size + 0.5 * R).all(1) & (rng.random(len(pts)) > rng.uniform(0.0, 0.3))
+    return pts[keep]
+
+
+def _layout(kind: str, n: int, size: int, R: float, min_d: float, rng: np.random.Generator) -> np.ndarray:
+    if kind == "packed":
+        return _packed(size, R, rng)
+    if kind == "clumps":
+        k = int(rng.integers(3, 11))
+        centres = rng.uniform(0, size, (k, 2))
+        sig = rng.uniform(2.0, 5.0, k) * R
+
+        def draw():
+            if rng.random() < 0.12:
+                return rng.uniform(-0.5 * R, size + 0.5 * R, 2)
+            j = int(rng.integers(k))
+            return centres[j] + rng.normal(0, sig[j], 2)
+        return _positions(int(n * 0.7), size, min_d, rng, 0, size, draw)
+    return _positions(n, size, min_d, rng, -0.5 * R, size + 0.5 * R)
 
 
 def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Scene:
@@ -211,7 +247,9 @@ def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Sc
     cov = rng.uniform(*cfg.coverage)
     n_rbc = int(cov * S * S / (np.pi * R * R))
     min_d = rng.uniform(*cfg.min_dist) * 2 * R
-    for x, y in _positions(n_rbc, S, min_d, rng, -0.5 * R, S + 0.5 * R):
+    w = np.array(cfg.layout_weights[:len(cfg.layouts)], float)
+    layout = str(rng.choice(cfg.layouts, p=w / w.sum()))
+    for x, y in _layout(layout, n_rbc, S, R, min_d, rng):
         put(group[int(rng.integers(len(group)))], x, y, 0, None, cfg.size_jitter)
     for x, y in _positions(rng.poisson(cfg.wbc_mean), S, 3 * R, rng, 0.0, S):
         t = str(rng.choice([t for t in cfg.wbc_types if bank.wbc.get(t)]))
@@ -235,7 +273,7 @@ def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Sc
     rim = None
     if rng.random() < cfg.rim_prob:
         c = rng.uniform(0.3, 0.7, 2) * S
-        rad = rng.uniform(0.55, 0.9) * S
+        rad = max(cfg.count_frac * rng.uniform(*cfg.rim_radius) * S - R, 0.1 * S)    # counting circle, not the eyepiece edge
         yy, xx = np.mgrid[:S, :S]
         rim = np.hypot(xx - c[0], yy - c[1]) <= rad
         img[~rim] = 0
@@ -245,12 +283,12 @@ def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Sc
     boxes, subs = [], []
     for cid, sub, b in placed:
         full = (b[2] - b[0] + 1) * (b[3] - b[1] + 1)
-        x1, y1, x2, y2 = (int(np.clip(v - m, 0, S - 1)) for v in b)
+        x1, y1, x2, y2 = (int(np.clip(v - m, 0, S - 1)) for v in b)   # box centre decides below
         if (x2 - x1 + 1) * (y2 - y1 + 1) < 0.5 * full or x2 - x1 < 6 or y2 - y1 < 6:
             continue
         if rim is not None and not rim[(y1 + y2) // 2, (x1 + x2) // 2]:
             continue
         boxes.append((cid, x1, y1, x2, y2))
         subs.append(sub)
-    return Scene(img, boxes, subs, dict(zoom=round(zoom, 3), coverage=round(cov, 3), min_dist=round(min_d / (2 * R), 3),
+    return Scene(img, boxes, subs, dict(zoom=round(zoom, 3), layout=layout, coverage=round(cov, 3), min_dist=round(min_d / (2 * R), 3),
                                         stain=round(float(strength), 3), rbc_od=round(float(scene_od), 3), rim=rim is not None))

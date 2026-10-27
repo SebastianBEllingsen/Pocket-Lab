@@ -54,7 +54,8 @@
 - Platelets: PBC's platelet class shows large thrombocytes, so they are rescaled to 0.2-0.45 of the red-cell radius to match "small purple dot".
 - Smudges: procedural pale ragged purple blobs (no public source).
 - Red-cell density is normalised per scene (mean OD 0.10-0.30) because stain density differs a lot between source images (first scenes had near-black cells next to pale ones).
-- Open: the teammate's hand labels give red-cell boxes of about 23 px at the 240 px crop scale although radius 16 implies 32 px; confirm the exact convention with him (`--rbc-radius` is a flag).
+- Teammate's conventions (2026-10-27, relayed by Sebastian): boxes tight around the whole outline (RBC with pallor; WBC with cytoplasm; smudge = whole pale patch; platelet = the dot), one box per cell also in clumps. Counting circle = 93% of eyepiece radius minus one red-cell radius; a cell counts when its box centre is inside. Training images are black outside the counting circle and cells there are unlabelled; cells whose centre is inside keep their full box even where the circle cuts them. The generator follows this (`rim_prob`, `rim_radius`, `count_frac`). Still open: his hand labels show red-cell boxes of about 23 px on a 240 px crop although radius 16 implies 32 px (he did not answer; `--rbc-radius` is a flag).
+- Layout (Sebastian: scenes looked too clustered): red cells are arranged by one of three layouts per scene: random (dart throwing, weight 0.4), packed (jittered hexagonal grid, the 100x look, 0.25) or clumps (Gaussian clusters, the 40x look, 0.35); coverage 0.15-0.65, centre distance 0.7-1.05 diameters.
 
 ## Open questions
 - Overlap idea as training-data preprocessing vs. an inference-time step (discussed; leaning: build and validate the splitter first, then decide; BCCD boxes and synthetic data give the validation).
