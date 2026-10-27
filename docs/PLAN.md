@@ -27,12 +27,14 @@ Output contract (to confirm against the teammate's final class list):
 - Target look: own eyepiece/phone photos at 40x and 100x (yellow, pink or white backgrounds, white-balance spread, optional eyepiece rim). Real photos not on this machine yet; Sebastian can get them.
 
 Revised steps:
-- [~] A. Stage 1 background removal (built, verdict pending): used to cut out cells and to find cell-free backgrounds.
-- [ ] B. Cut-out bank: RBC (Data_Set_1 isolated cells, BCCD), WBC and platelet (PBC, class kept), smudge (synthesised pale or broken blobs), cell-free backgrounds. Each cut-out stored with mask and source class; rescaled to RBC radius 16 px.
-- [ ] C. Generator v1: random placement, rotation, optical-density blending for overlaps, soft alpha edges, border cells, class ratios, exact boxes. CLI with seed.
-- [ ] D. Realism: white-balance and stain re-tint, blur, noise, JPEG artefacts, vignette, optional eyepiece rim.
-- [ ] E. Export in the teammate's format, previews for Sebastian to check, hand-over notes.
+- [x] A. Stage 1 background removal: `lower` threshold and circle finder chosen by Sebastian (2026-10-27). Not usable for cutting cells out of the own photos (faint cells); used for the public datasets and for glass fields.
+- [~] B. (built, contact sheets shown, verdict pending) Cut-out bank: RBC (Data_Set_1 isolated cells, BCCD), WBC and platelet (PBC, class kept), smudge (synthesised pale or broken blobs), cell-free backgrounds. Each cut-out stored with mask and source class; rescaled to RBC radius 16 px.
+- [~] C. (built, first scenes compared with real photos, verdict pending) Generator v1: random placement, rotation, optical-density blending for overlaps, soft alpha edges, border cells, class ratios, exact boxes. CLI with seed.
+- [~] D. (first pass inside the generator: blur, noise, JPEG, white balance, vignette, rim) Realism: white-balance and stain re-tint, blur, noise, JPEG artefacts, vignette, optional eyepiece rim.
+- [~] E. (writer built and tested; teammate's exact conventions still to confirm) Export in the teammate's format, previews for Sebastian to check, hand-over notes.
 - [ ] F. Check with the teammate whether the synthetic data helps on his real test crops; tune generator from that.
+
+Where we left off (2026-10-27): bank (about 2.7k cut-outs from 60 DS1 + 800 PBC images, 101 glass fields, 56 from own photos) and generator v1 exist. Scenes were compared with real 100x/40x crops: the middle ground looks right (size, density, soft pink cells, WBC, platelets). Next: Sebastian's verdict on scenes (`python -m cellcount.synth --n 6 --show`), confirm box convention and rim handling with the teammate, then the realism pass (hexagonal packing at 100x, rouleaux at 40x, platelet clumps, WBC cytoplasm halo), more smudge variety, bigger bank, and a first hand-over dataset.
 
 ## Roadmap (original, 2026-10-11)
 - [x] 0. Inspect datasets (done 2026-10-11, see DATASETS.md). PBC added as Data_Set_3. Still to do: check/replace the Data_Set_2 classification split (leakage question), look for more full-field data.

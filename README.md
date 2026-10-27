@@ -53,6 +53,18 @@ python -m cellcount.bg_removal --list                          # image indices a
 python -m cellcount.bg_removal --method mode --worst 6 --stats # compare against the older single-rule estimator
 python -m cellcount.bg_removal --proposers mode,border --full  # choose which proposers vote
 ```
+New in the background-removal CLI: `--threshold lower|otsu|half|clipped[,..]` (several names compare side by side; default `lower`) and `--fov auto|off` (finds the eyepiece circle in phone photos).
+
+## Synthetic training data (current focus)
+Builds a synthetic YOLO training set (classes rbc, wbc, platelet, smudge; WBC type in a sidecar) for the teammate's detector.
+```bash
+python -m cellcount.synth.bank --sheets --stats        # build the cut-out bank and glass fields in Data_Sets/synth_bank, plus contact sheets to check
+python -m cellcount.synth --n 6 --show                 # look at scenes with their boxes (keys r/w/p/s toggle classes)
+python -m cellcount.synth --n 2000 --out Data_Sets/synth_out --split train   # write a YOLO dataset
+python -m cellcount.synth --help                       # every scene parameter is a flag
+```
+The real phone photos go in `Data_Sets/own_v2/own_v2/` (git-ignored); they supply the glass colours for the scenes.
+
 In the window: left/right arrows change image, keys `o`/`g`/`d`/`b` (or the check boxes) toggle our outline, the dataset's reference mask, the difference map and annotated boxes; `q` closes.
 
 Tests: `python -m unittest discover -s tests -t .`

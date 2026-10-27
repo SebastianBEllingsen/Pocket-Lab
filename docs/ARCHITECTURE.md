@@ -25,6 +25,19 @@ Background removal in short: the default `consensus` estimator lets several prop
 
 The old `src/preprocess.py` prototype was removed (superseded).
 
+## Synthetic data package (2026-10-27)
+```
+cellcount/bg_removal/thresholds.py  threshold pickers: lower (default), otsu, half, clipped
+cellcount/bg_removal/fov.py         eyepiece circle finder (own photos); mask is cut to the circle
+cellcount/synth/cutouts.py          Cutout dataclass, PNG bank I/O, extraction from DS1 masks and PBC
+cellcount/synth/bank.py             python -m cellcount.synth.bank : build bank + glass fields + contact sheets
+cellcount/synth/scene.py            generate_scene(): placement, optical-density blend, optics, rim, exact boxes
+cellcount/synth/export.py           YOLO writer (+ wbc_types.csv, manifest.csv), per-class box layers
+cellcount/synth/cli.py              python -m cellcount.synth : viewer (--show/--save) and dataset writer (--out)
+tests/test_synth.py                 tiny in-memory bank tests
+```
+Flow: public datasets -> bank (cut-outs at RBC radius 32 px, glass fields) in `Data_Sets/synth_bank` -> scenes (640 px, RBC radius 16 px) -> YOLO folder for the teammate. Detector classes: 0 rbc, 1 wbc, 2 platelet, 3 smudge; WBC subtype goes to the sidecar.
+
 ## Proposed layout (later stages, not built)
 ```
 cellcount/

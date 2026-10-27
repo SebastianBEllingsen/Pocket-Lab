@@ -38,6 +38,9 @@ Relative size (WBC size / RBC reference) helps separate subtypes (e.g. lymphocyt
 - Warning from a 2024 arXiv audit: BCCD has missing labels and heavy overlap, so do not treat its boxes as perfect ground truth.
 - Caveat: PBC is single-cell crops at one fixed zoom, so it helps classification but not counting or zoom invariance.
 
+## 7b. Research result 2026-10-27 (synthetic generation)
+See DECISIONS.md "build our own compositing": Albumentations (now AGPL or paid) and Ultralytics (AGPL) rejected as generators; Cut-Paste-Learn and the Roche overlap paper guide the blending. Not yet evaluated: Poisson blending, SAM-based cut-outs, generative models.
+
 ## 8. Open-source frameworks to evaluate instead of building from scratch
 Requested by Sebastian 2026-10-11: check existing open source first and modify it where it fits. Building our own is equally valid when it is the better option; weigh pros and cons for each stage. The list below is from general knowledge and has NOT been verified this session (versions, licences, maintenance, install size on a 4 GB GPU). Check each before adopting. Each would sit behind one of our stage interfaces (adapter), so it can be compared with our own methods.
 
