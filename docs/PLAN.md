@@ -22,7 +22,8 @@ Scope: this part produces synthetic training data only; a teammate trains and ev
 Output contract (to confirm against the teammate's final class list):
 - YOLO txt labels, 640x640 tiles, `data.yaml`, `images|labels/{train,val,test}`; synthetic data goes into `train` only.
 - Scale: RBC radius 16 px (the teammate normalises all real images to this before detection).
-- Classes: rbc, platelet, smudge, plus the 7 WBC types basophil, eosinophil, erythroblast, ig, lymphocyte, monocyte, neutrophil (the 7 non-platelet PBC classes). Exact names and order: to be confirmed with the teammate.
+- Detector classes (teammate, confirmed 2026-10-27), in this order: 0 rbc, 1 wbc, 2 platelet, 3 smudge. WBC subtypes are NOT detector classes: a separate type model classifies each wbc crop into basophil, eosinophil, erythroblast, ig, lymphocyte, monocyte, neutrophil (or unknown). The generator therefore writes the 4-class YOLO labels plus a sidecar with the WBC subtype per box, and can export PBC-style single-cell crops with type labels for the type model.
+- Real photos: `Data_Sets/own_v2/own_v2/` (unk_40x_*, unk_100x_*, 2880x2160 with a dark eyepiece rim around a bright circle). Stage 1 currently takes the rim as background and the whole circle as foreground, so it needs a field-of-view step for these photos.
 - Target look: own eyepiece/phone photos at 40x and 100x (yellow, pink or white backgrounds, white-balance spread, optional eyepiece rim). Real photos not on this machine yet; Sebastian can get them.
 
 Revised steps:
