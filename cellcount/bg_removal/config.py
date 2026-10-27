@@ -17,6 +17,12 @@ Fields
     blur           Gaussian sigma (px) applied to the distance map before thresholding
     min_area_frac  connected blobs smaller than this fraction of the image are removed
     fill_holes     fill enclosed holes (pale cell centres)
+    threshold      threshold picker (see thresholds.py): "otsu" (default), "half", "lower", "clipped"
+    threshold_scale  "half" picker: multiplier on the Otsu value
+    fov            field of view: "auto" (find a bright circle inside a dark rim, work inside it) or "off"
+    fov_shrink     fraction of the fitted circle radius kept (drops the soft rim)
+    fov_cut_frac   circle finder: grey cut-off as a fraction of the Otsu value (low keeps shadowed glass)
+    fov_min_roundness  blob area / fitted circle area needed to accept a circle
 """
 from __future__ import annotations
 
@@ -38,3 +44,9 @@ class BgConfig:
     blur: float = 2.0
     min_area_frac: float = 2e-4
     fill_holes: bool = True
+    threshold: str = "otsu"
+    threshold_scale: float = 0.5
+    fov: str = "auto"
+    fov_shrink: float = 0.98
+    fov_cut_frac: float = 0.25
+    fov_min_roundness: float = 0.85

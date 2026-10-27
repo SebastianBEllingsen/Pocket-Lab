@@ -2,6 +2,7 @@
 
 Public API
     build_page(sample, img, result, ref_mask, boxes, opts) -> Page
+    build_compare_page(sample, img, results, ref_mask, opts) -> Page   one overlay per threshold variant
 
 ``opts`` is a ``ViewOptions``: which view (minimal/full/explain) and the initial state
 of each overlay layer. Layer hotkeys: o = ours, g = ground truth, d = difference, b = boxes.
@@ -90,7 +91,7 @@ def build_page(sample: Sample, img, result: BgResult, ref_mask, boxes: list[Box]
         f"method={cfg.method} proposers={','.join(cfg.proposers)} agree_tol={cfg.agree_tol:g} scale={cfg.scale:g} bins={cfg.bins} tol={cfg.tol:g} sigma_frac={cfg.sigma_frac:g} "
         f"blur={cfg.blur:g} min_area_frac={cfg.min_area_frac:g} fill_holes={cfg.fill_holes}",
         f"background colour votes: {int(sc['votes_agree'])}/{int(sc['votes_total'])} agree" if sc["votes_total"] > 1 else "",
-        f"Otsu threshold={sc['threshold']:.1f}  foreground={sc['foreground_pct']:.1f}%  blobs={int(sc['blobs'])}  "
+        f"threshold ({cfg.threshold})={sc['threshold']:.1f}  foreground={sc['foreground_pct']:.1f}%  blobs={int(sc['blobs'])}  "
         f"bg colour (Lab)=({', '.join(f'{v:.0f}' for v in result.reference_lab)})",
         ("IoU=%.3f  Dice=%.3f  (against the dataset's reference mask)" % (sc["iou"], sc["dice"]))
         if "iou" in sc else "no reference mask in this dataset: judge by eye (use --boxes for annotated boxes)",
@@ -109,3 +110,25 @@ def build_page(sample: Sample, img, result: BgResult, ref_mask, boxes: list[Box]
         panels = [_step_panel(s) for s in result.trace] + [overlay]
         cols = 4
     return Page(f"Background removal - {o.view}", info, panels, cols, f"{sample.name}_{o.view}")
+
+
+def build_compare_page(sample: Sample, img, results: list[BgResult], ref_mask, o: ViewOptions) -> Page:
+    """Original plus one overlay per result (same image, different threshold pickers).
+    All overlays share hotkey 'o', so one key toggles every outline at once."""
+    colour = parse_color(o.color_ours) if o.color_ours else \
+        pick_contrasting_colors(img, [np.logical_or.reduce([r.mask > 0 for r in results])], 1)[0]
+    t = o.thickness or max(1, img.shape[1] // 500)
+    panels = [Panel("Original", "image", img)]
+    lines = []
+    for r in results:
+        sc = scores(r, ref_mask)
+        title = f"{r.config.threshold} (cut-off {sc['threshold']:.1f})"
+        cap = f"foreground {sc['foreground_pct']:.1f}%, blobs {int(sc['blobs'])}" + (f", IoU {sc['iou']:.3f}" if "iou" in sc else "")
+        lines.append(f"{title}: {cap}")
+        layer = Layer("ours", "o", outline_rgba(r.mask > 0, colour, t), colour, "our outline", o.show_ours)
+        panels.append(Panel(title, "overlay", img, cap, [layer]))
+    cfg = results[0].config
+    info = [f"image: {sample.name}  ({sample.dataset}, {img.shape[1]}x{img.shape[0]}px)  -  threshold comparison",
+            f"method={cfg.method} fov={cfg.fov} threshold_scale={cfg.threshold_scale:g} blur={cfg.blur:g} fill_holes={cfg.fill_holes}"]
+    cols = min(len(panels), 3 if len(panels) > 4 else 2 if len(panels) == 4 else len(panels))
+    return Page("Background removal - threshold comparison", info, panels, cols, f"{sample.name}_compare")

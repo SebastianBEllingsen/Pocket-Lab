@@ -28,6 +28,10 @@ Output
 Algorithm parameters (defaults come from BgConfig)
     --method {consensus,mode,median} --proposers a,b,c --agree-tol --min-cluster-frac --border-frac
     --scale --bins --tol --sigma-frac --kernel-frac --blur --min-area-frac --no-fill-holes
+    --threshold {otsu,half,lower,clipped}[,more]   cut-off picker; several names = side-by-side comparison
+    --threshold-scale X   multiplier used by "half"
+    --fov {auto,off}      find the eyepiece circle (bright circle in a dark rim) and work inside it
+    --fov-shrink --fov-cut-frac --fov-min-roundness
 """
 from __future__ import annotations
 
@@ -42,7 +46,8 @@ from ..common.selection import add_selection_args, print_listing, select_samples
 from .config import BgConfig
 from .methods import METHODS
 from .proposers import PROPOSERS
-from .panels import ViewOptions, build_page, scores
+from .panels import ViewOptions, build_compare_page, build_page, scores
+from .thresholds import THRESHOLDS
 from .pipeline import remove_background
 
 
@@ -88,11 +93,27 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--blur", type=float, default=d.blur, help="distance-map blur sigma in px")
     a.add_argument("--min-area-frac", type=float, default=d.min_area_frac, help="remove blobs smaller than this fraction")
     a.add_argument("--no-fill-holes", action="store_true", help="do not fill enclosed holes")
+    a.add_argument("--threshold", default=d.threshold, metavar="NAME[,NAME]",
+                   help=f"cut-off picker (available: {', '.join(sorted(THRESHOLDS))}); several names compare them side by side")
+    a.add_argument("--threshold-scale", type=float, default=d.threshold_scale, help='"half" picker: multiplier on the Otsu value')
+    a.add_argument("--fov", choices=("auto", "off"), default=d.fov, help="eyepiece circle: find it and work inside (auto) or ignore it")
+    a.add_argument("--fov-shrink", type=float, default=d.fov_shrink, help="fraction of the fitted circle radius kept")
+    a.add_argument("--fov-cut-frac", type=float, default=d.fov_cut_frac, help="circle finder grey cut-off, fraction of the Otsu value")
+    a.add_argument("--fov-min-roundness", type=float, default=d.fov_min_roundness, help="blob/circle area ratio needed to accept a circle")
     return p
 
 
-def config_from_args(args: argparse.Namespace) -> BgConfig:
-    kw = {f.name: getattr(args, f.name) for f in fields(BgConfig) if f.name not in ("fill_holes", "proposers")}
+def threshold_names(args: argparse.Namespace) -> list[str]:
+    names = [n.strip() for n in args.threshold.split(",") if n.strip()]
+    unknown = [n for n in names if n not in THRESHOLDS]
+    if unknown or not names:
+        raise ValueError(f"unknown threshold(s) {unknown}; available: {sorted(THRESHOLDS)}")
+    return names
+
+
+def config_from_args(args: argparse.Namespace, threshold: str | None = None) -> BgConfig:
+    kw = {f.name: getattr(args, f.name) for f in fields(BgConfig) if f.name not in ("fill_holes", "proposers", "threshold")}
+    kw["threshold"] = threshold or threshold_names(args)[0]
     names = tuple(n.strip() for n in args.proposers.split(",") if n.strip())
     unknown = [n for n in names if n not in PROPOSERS]
     if unknown:
@@ -107,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.list:
             print_listing(samples)
             return 0
+        names = threshold_names(args)
         cfg = config_from_args(args)
 
         def scorer(s):
@@ -123,6 +145,11 @@ def main(argv: list[str] | None = None) -> int:
     pages, rows = [], []
     for s in chosen:
         img, ref, boxes = s.load_image(), s.load_mask(), s.load_boxes()
+        if len(names) > 1:
+            results = [remove_background(img, config_from_args(args, n)) for n in names]
+            pages.append(build_compare_page(s, img, results, ref, opts))
+            rows.extend((f"{s.name} [{n}]", scores(r, ref)) for n, r in zip(names, results))
+            continue
         result = remove_background(img, cfg)
         pages.append(build_page(s, img, result, ref, boxes, opts))
         rows.append((s.name, scores(result, ref)))

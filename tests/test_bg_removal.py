@@ -23,6 +23,15 @@ def synthetic(corner_cell: bool = False):
     return img, truth > 0
 
 
+def pale_cells_with_dark_nucleus():
+    """Pale cells (hard for Otsu) next to one dark blob that pulls Otsu up."""
+    img = np.full((240, 320, 3), (225, 232, 228), np.uint8)
+    for cy, cx in [(60, 70), (150, 160), (200, 90), (90, 250)]:
+        cv.circle(img, (cx, cy), 22, (200, 190, 215), -1)
+    cv.circle(img, (160, 60), 14, (90, 30, 90), -1)
+    return img
+
+
 class MetricsTest(unittest.TestCase):
     def test_identical_and_disjoint(self):
         a = np.zeros((10, 10), bool); a[:5] = True
@@ -73,3 +82,28 @@ class BackgroundRemovalTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ThresholdAndFovTest(unittest.TestCase):
+    def test_lower_pickers_keep_pale_cells(self):
+        img = pale_cells_with_dark_nucleus()
+        fg = {n: remove_background(img, BgConfig(threshold=n)).mask[150, 160] for n in ("otsu", "lower")}
+        self.assertEqual(fg["otsu"], 0)          # pale cell missed by the global Otsu cut
+        self.assertEqual(fg["lower"], 255)
+
+    def test_unknown_threshold_is_an_error(self):
+        with self.assertRaises(ValueError):
+            remove_background(pale_cells_with_dark_nucleus(), BgConfig(threshold="nope"))
+
+    def test_fov_circle_excludes_rim(self):
+        img = np.zeros((300, 400, 3), np.uint8)
+        cv.circle(img, (200, 150), 120, (200, 220, 230), -1)
+        cv.circle(img, (200, 150), 15, (140, 90, 170), -1)
+        r = remove_background(img)
+        self.assertIsNotNone(r.fov)
+        self.assertEqual(r.mask[5, 5], 0)        # rim is never foreground
+        self.assertEqual(r.mask[150, 200], 255)  # the cell inside the circle is
+
+    def test_no_fov_on_full_frame_image(self):
+        img, _ = synthetic()
+        self.assertIsNone(remove_background(img).fov)

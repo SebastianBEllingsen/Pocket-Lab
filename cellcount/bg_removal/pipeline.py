@@ -6,10 +6,10 @@ result and the values used, so a viewer (``--explain``) or a test can inspect an
 Public API
     Step                      one recorded stage (name, caption, kind, array, values)
     BgResult                  mask, flattened, background, distance, threshold, stats, trace
-    remove_background(img, cfg=BgConfig())
+    remove_background(img, cfg=BgConfig())   (finds the eyepiece circle first when cfg.fov == "auto")
 
 Steps recorded: input -> background estimate (+ colour votes) -> flattened -> distance to background
--> histogram + Otsu threshold -> raw mask -> holes filled -> specks removed (final).
+-> histogram + threshold (see thresholds.py) -> raw mask -> holes filled -> specks removed (final).
 
 Flattening (image / background) is for display and downstream stages; the mask
 itself is derived from the Lab distance to the background colour, so it does not
@@ -24,7 +24,9 @@ import cv2 as cv
 import numpy as np
 
 from .config import BgConfig
+from .fov import find_fov
 from .methods import estimate
+from .thresholds import pick_threshold
 
 
 @dataclass
@@ -42,11 +44,12 @@ class BgResult:
     flattened: np.ndarray       # BGR uint8
     background: np.ndarray      # BGR uint8
     distance: np.ndarray        # float32, Lab distance to background
-    threshold: float            # Otsu threshold in distance units
+    threshold: float            # chosen threshold in distance units
     reference_lab: tuple[float, float, float]
     config: BgConfig
     trace: list[Step]
     stats: dict[str, float]
+    fov: np.ndarray | None = None   # uint8 0/255 field-of-view circle (full size), None when not used
 
 
 def _lab_to_bgr(lab: np.ndarray) -> np.ndarray:
@@ -72,7 +75,7 @@ def _count_blobs(mask: np.ndarray) -> int:
     return cv.connectedComponents(mask)[0] - 1
 
 
-def remove_background(img: np.ndarray, cfg: BgConfig = BgConfig()) -> BgResult:
+def _remove(img: np.ndarray, cfg: BgConfig) -> BgResult:
     h, w = img.shape[:2]
     trace: list[Step] = [Step("Input", f"Original image, {w}x{h}px", "image", img,
                               {"size": f"{w}x{h}", "mean BGR": np.round(img.reshape(-1, 3).mean(0), 1).tolist()})]
@@ -109,12 +112,11 @@ def remove_background(img: np.ndarray, cfg: BgConfig = BgConfig()) -> BgResult:
                       f"(blurred, sigma {cfg.blur:g}px). Bright = unlike background", "heatmap", dist,
                       {"min": round(float(dist.min()), 1), "max": round(dmax, 1), "mean": round(float(dist.mean()), 1)}))
 
-    d8 = np.clip(dist / dmax * 255, 0, 255).astype(np.uint8)
-    t8, raw = cv.threshold(d8, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-    threshold = float(t8) / 255.0 * dmax
+    threshold = pick_threshold(dist, cfg)
+    raw = ((dist > threshold) * 255).astype(np.uint8)
     fg_raw = int((raw > 0).sum())
-    trace.append(Step("Histogram + Otsu", "Distribution of the distance map. Otsu picks the threshold that best "
-                      "separates background from cells, per image", "hist", dist,
+    trace.append(Step(f"Histogram + threshold ({cfg.threshold})", "Distribution of the distance map and the "
+                      f"cut-off chosen by the '{cfg.threshold}' picker, per image", "hist", dist,
                       {"threshold": round(threshold, 2)}))
     trace.append(Step("Raw mask", "Pixels with distance above the threshold", "mask", raw,
                       {"foreground px": fg_raw, "blobs": _count_blobs(raw)}))
@@ -133,3 +135,33 @@ def remove_background(img: np.ndarray, cfg: BgConfig = BgConfig()) -> BgResult:
 
     stats = {"votes_agree": float(sum(est.agreeing)), "votes_total": float(len(est.proposals)), "threshold": threshold, "foreground_pct": 100.0 * float((mask > 0).mean()), "blobs": float(after)}
     return BgResult(mask, flat, background, dist, threshold, est.reference_lab, cfg, trace, stats)
+
+
+def remove_background(img: np.ndarray, cfg: BgConfig = BgConfig()) -> BgResult:
+    """Foreground mask for ``img``. With cfg.fov == "auto" and a dark rim around a bright
+    circle, the work happens on the circle's bounding box (corners filled with the glass
+    colour) and the mask is cut to the circle; all arrays are returned at full image size."""
+    fov = find_fov(img, cfg) if cfg.fov == "auto" else None
+    if fov is None:
+        return _remove(img, cfg)
+    h, w = img.shape[:2]
+    x, y, bw, bh = cv.boundingRect(fov)
+    crop, inside = img[y:y + bh, x:x + bw].copy(), fov[y:y + bh, x:x + bw] > 0
+    crop[~inside] = np.median(crop[inside], axis=0).astype(np.uint8)   # typical glass colour, so it cannot win the vote
+    r = _remove(crop, cfg)
+
+    def paste(a: np.ndarray, fill=0) -> np.ndarray:
+        out = np.full((h, w) + a.shape[2:], fill, a.dtype)
+        out[y:y + bh, x:x + bw] = a
+        return out
+
+    mask = paste(r.mask)
+    mask[fov == 0] = 0
+    trace = list(r.trace)
+    trace.insert(1, Step("Field of view", "Bright circle found inside a dark rim; background removal works "
+                         "inside it and the rim is excluded", "mask", fov,
+                         {"circle px": int((fov > 0).sum()), "box": f"{bw}x{bh} at ({x},{y})"}))
+    stats = dict(r.stats, foreground_pct=100.0 * float((mask > 0).sum()) / max(1, int((fov > 0).sum())),
+                 blobs=float(_count_blobs(mask)))
+    return BgResult(mask, paste(r.flattened), paste(r.background), paste(r.distance), r.threshold,
+                    r.reference_lab, cfg, trace, stats, fov)
