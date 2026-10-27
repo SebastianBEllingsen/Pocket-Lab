@@ -12,9 +12,9 @@ Public API
     otsu_of(values, vmax)      Otsu cut-off of 1-D values in [0, vmax]
 
 Pickers
-    otsu     Otsu on the whole map (the original behaviour, default for now)
+    otsu     Otsu on the whole map (the original behaviour)
     half     cfg.threshold_scale (default 0.5) times the Otsu value
-    lower    Otsu again on only the values below the first Otsu cut-off (a 3-class split
+    lower    (default, chosen by Sebastian 2026-10-27) Otsu again on only the values below the first Otsu cut-off (a 3-class split
              that takes the bottom boundary: background vs. pale cells)
     clipped  Otsu after clipping the map at the median of the values above the first
              cut-off, so a few very dark pixels cannot dominate the split

@@ -48,8 +48,9 @@ class BackgroundRemovalTest(unittest.TestCase):
     def test_methods_find_the_cells(self):
         img, truth = synthetic()
         for method in ("mode", "median"):
-            r = remove_background(img, BgConfig(method=method))
-            self.assertGreater(iou(r.mask > 0, truth), 0.9, method)
+            for picker, floor in (("otsu", 0.9), ("lower", 0.8)):   # lower trades some clean-image IoU for pale cells
+                r = remove_background(img, BgConfig(method=method, threshold=picker))
+                self.assertGreater(iou(r.mask > 0, truth), floor, f"{method}/{picker}")
 
     def test_cell_touching_corner_does_not_flood_mask(self):
         img, truth = synthetic(corner_cell=True)
