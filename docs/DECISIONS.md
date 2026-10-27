@@ -18,6 +18,7 @@
 - 2026-10-11: Viewer design agreed: contrasting auto outline colours, legend naming each line, layer toggles (o/g/d/b + check boxes), `--minimal/--full/--explain`, `--stats` optional, every parameter a flag.
 - 2026-10-11: Sebastian's visual verdict is the sign-off for each step; his ratings will later feed a golden set via a rating tool (not built yet).
 - 2026-10-11: Course rules allow any approach (frameworks or our own) as long as the choices are explained in the report. So every significant choice needs its reasoning recorded here (options considered, pros and cons, why chosen, evidence such as scores) to feed the report.
+- 2026-10-27: Scope change (Sebastian). This part of the project only produces synthetic training data to enlarge the training set; a teammate trains the models on it. Stage 1 (background removal) stays because it feeds cut-out and background extraction. Detector/classifier training, the method comparison and the Data_Set_2 split question are out of scope for this part. The roadmap is to be reordered around the generator and its output format (to be agreed).
 
 ### Decision record: how to pick the background colour (2026-10-11)
 - Problem: the single "most common colour" rule fails when cells cover most of the frame (pale grey Data_Set_1 image 604478c7: IoU 0.37, 96% marked foreground).
