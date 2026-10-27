@@ -149,4 +149,4 @@ def _load_bccd(root: Path) -> list[Sample]:
 def _load_pbc(root: Path) -> list[Sample]:
     base = root / "Data_Set_3" / "extracted" / "PBC_dataset_normal_DIB"
     return [Sample("pbc", img.stem, img, label=img.parent.name)
-            for img in base.glob("*/*") if img.suffix.lower() in IMAGE_SUFFIXES]
+            for img in base.glob("*/*") if img.suffix.lower() in IMAGE_SUFFIXES and not img.name.startswith(".")]
