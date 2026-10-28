@@ -1,5 +1,6 @@
 """
-Compare the classical counter and YOLO26 (Stage A, Stage B) on our own test photos.
+Compare the classical counter, YOLO26 (Stage A, Stage B) and the first-release pipeline
+(YOLO11 + post-processing, as-is and on PBC-scaled tiles) on our own test photos.
 
     python evaluate.py
 
@@ -22,6 +23,13 @@ from make_count_crops import SIZE, MARGIN
 from ultralytics import YOLO
 from count_cells import process
 from count_yolo26 import detect
+import cv2
+import torch
+from torchvision.ops import nms
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "first_release"))
+import yolo_detection as first_release                  # first-release YOLO11 + post-processing
+first_release.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "models", "blood_cells.pt")
 
 GT = "ground_truth"
 TEST_DIR = "data/own_v2"
@@ -31,6 +39,7 @@ WEIGHTS = {"stageA": "runs/detect/stageA_public/weights/best.pt",   # public dat
 TYPES = ["basophil", "eosinophil", "erythroblast", "ig", "lymphocyte", "monocyte",
          "neutrophil"]
 PRED_TYPES = "data/wbc_types/predictions.csv"    # written by scripts/make_wbc_crops.py
+PBC_TILE, PBC_STRIDE, PBC_RBC_RADIUS = 360, 180, 35.4   # first-release input: PBC-sized crops
 
 
 def crop_name(path):
@@ -209,6 +218,7 @@ def write_csv(path, rows):
         w.writeheader()
         w.writerows(rows)
 
+
 def write_report(check, count_sum, box_sum, type_rows, boxed_sum, out="reports"):
     """reports/eval.md: all tables of the evaluation, ready to read or copy."""
     found, acc, confusion, cal = summarise_types(type_rows)
@@ -271,24 +281,65 @@ def write_report(check, count_sum, box_sum, type_rows, boxed_sum, out="reports")
         f.write("\n".join(L) + "\n")
 
 
-def run_methods(images, weights=WEIGHTS, conf=0.25, tmp="data/eval_tmp"):
+def first_release_boxes(raw, nrm, squares):
+    """The first-release pipeline (YOLO11 + post-processing) on one photo, as two
+    methods, boxes in normalised px:
+      first_release_asis  the whole photo, as the first-release app would receive it
+      first_release_pbc   the photo scaled so a red cell has the PBC radius (35.4 px)
+                          and cut into 360 px tiles around each count square: the
+                          image size and cell size the model was trained on"""
+    s = nrm["scale"]                                      # raw px -> normalised px
+    kind = lambda t: t if t in ("rbc", "platelet") else "wbc"
+    asis = [(kind(c["type"]), *(v * s for v in c["box"]))
+            for c in first_release.detect_cells(raw)]
+
+    f = PBC_RBC_RADIUS / nrm["rbc_radius_px"]             # raw px -> PBC px
+    pbc = cv2.resize(raw, None, fx=f, fy=f,
+                     interpolation=cv2.INTER_AREA if f < 1 else cv2.INTER_LINEAR)
+    pad = PBC_TILE
+    pbc = cv2.copyMakeBorder(pbc, pad, pad, pad, pad, cv2.BORDER_REPLICATE)
+    boxes, scores, types = [], [], []
+    for sq in squares:
+        # the square plus one stride of margin, in padded PBC px
+        x0, y0 = (int(sq[k] / s * f) + pad - PBC_STRIDE for k in ("x0", "y0"))
+        x1, y1 = (int(sq[k] / s * f) + pad + PBC_STRIDE for k in ("x1", "y1"))
+        for ty in range(y0, y1 - PBC_TILE + PBC_STRIDE, PBC_STRIDE):
+            for tx in range(x0, x1 - PBC_TILE + PBC_STRIDE, PBC_STRIDE):
+                for c in first_release.detect_cells(pbc[ty:ty + PBC_TILE, tx:tx + PBC_TILE]):
+                    bx0, by0, bx1, by1 = c["box"]
+                    if min(bx0, by0) <= 2 or max(bx1, by1) >= PBC_TILE - 2:
+                        continue          # cut by the tile edge; an overlapping tile sees it whole
+                    boxes.append([bx0 + tx, by0 + ty, bx1 + tx, by1 + ty])
+                    scores.append(c["confidence"] + 1e-3)   # post-processing boxes have 0
+                    types.append(kind(c["type"]))
+    if not boxes:
+        return asis, []
+    keep = nms(torch.tensor(boxes, dtype=torch.float32), torch.tensor(scores), 0.5).tolist()
+    back = s / f                                          # padded PBC px -> normalised px
+    return asis, [(types[i], *((v - pad) * back for v in boxes[i])) for i in keep]
+
+
+def run_methods(gt, weights=WEIGHTS, conf=0.25, tmp="data/eval_tmp"):
     """Boxes of every method per test photo, in normalised px:
     {method: {image: [(class_name, x0, y0, x1, y1), ...]}}. Also returns the classical
     counter's clumps that hold more cells than boxes: {image: [(box, n_missing), ...]},
-    so its square counts include the area-based clump correction, as its totals do."""
+    so its square counts include the area-based clump correction, as its totals do.
+    The two first_release_* methods are explained in first_release_boxes()."""
     os.makedirs(tmp, exist_ok=True)
     models = {m: YOLO(w) for m, w in weights.items()}
-    dets = {m: {} for m in ["classical", *models]}
+    dets = {m: {} for m in ["classical", *models, "first_release_asis", "first_release_pbc"]}
     extra = {}
-    for image in images:
+    for image in sorted(gt):
+        path = os.path.join(TEST_DIR, image + ".jpg")
         # one normalise() per photo, shared by all methods -> identical coordinates
-        _, nrm, cdets, review = process(os.path.join(TEST_DIR, image + ".jpg"), tmp,
-                                        return_dets=True)
+        _, nrm, cdets, review = process(path, tmp, return_dets=True)
         dets["classical"][image] = [(CLASSES[c], x0, y0, x1, y1) for c, x0, y0, x1, y1 in cdets]
         extra[image] = [(("rbc", x0, y0, x1, y1), n) for x0, y0, x1, y1, n in review]
         for m, model in models.items():
             b, c = detect(model, nrm, conf)
             dets[m][image] = [(model.names[int(k)], *map(float, bb)) for bb, k in zip(b, c)]
+        dets["first_release_asis"][image], dets["first_release_pbc"][image] = \
+            first_release_boxes(cv2.imread(path), nrm, gt[image])
     return dets, extra
 
 
@@ -300,7 +351,7 @@ if __name__ == "__main__":
          for s in sqs if s["boxed"]]
     check = (f"{len(d)} boxed squares, mean |hand - boxes| {np.mean(d):.2f} -> "
              f"{'accepted' if d and np.mean(d) <= 1.5 else 'NOT accepted'}")
-    dets, extra = run_methods(sorted(gt))
+    dets, extra = run_methods(gt)
     rows = rbc_squares(gt, dets, extra)
     types = wbc_type_rows()
     write_report(check, summarise_counts(rows), summarise_boxes(rows), types,
