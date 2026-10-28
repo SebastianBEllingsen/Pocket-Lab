@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, url_for
-from cell_detection import detect_cells, draw_cells
+from cell_analysis import analyse, draw
 from processing.zoom import zoom_in
 from processing.image import open_image
 from processing.crop import crop_image
@@ -12,6 +12,7 @@ from processing.shape import (
 )
 import cv2
 import os
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -522,88 +523,137 @@ def redo():
         "zoom": zoom_level
     })
 
+
+# -------------------------
+# CELL ANALYSIS
+# -------------------------
+
+def get_analysis():
+    """Run (or reuse) the cell analysis of the current image.
+    Returns (result, None) or (None, error response)."""
+    if current_image is None:
+        return None, jsonify({
+            "success": False,
+            "count": "--",
+            "message": "No image loaded"
+        })
+
+    try:
+        return analyse(current_image), None
+
+    except Exception as error:
+        # e.g. no round red cells found, so the cell size cannot be measured
+        print("Analysis failed:", error)
+        return None, jsonify({
+            "success": False,
+            "count": "--",
+            "message": "Could not analyse this image (cell size not found)"
+        })
+
+
 # -------------------------
 # CELL COUNTING
 # -------------------------
 
-@app.route("/count-red", methods=["POST"])
-def count_red():
-    if current_image is None:
-        return jsonify({"success": False, "count": "--", "message": "No image loaded"})
+def count_response(cell_class, label):
+    result, error = get_analysis()
+    if error is not None:
+        return error
 
-    rbc_contours, _ = detect_cells(current_image)
+    count = result["counts"][cell_class]
 
     return jsonify({
         "success": True,
-        "count": len(rbc_contours),
-        "message": f"Found {len(rbc_contours)} red blood cells"
+        "count": count,
+        "message": f"Found {count} {label}"
     })
+
+
+@app.route("/count-red", methods=["POST"])
+def count_red():
+    return count_response("rbc", "red blood cells")
+
+
+def type_summary(result):
+    """White cell types of the image, e.g. '2 neutrophil, 1 lymphocyte'."""
+    return ", ".join(
+        f"{n} {t}" for t, n in Counter(result["wbc_types"]).most_common()
+    )
 
 
 @app.route("/count-white", methods=["POST"])
 def count_white():
-    if current_image is None:
-        return jsonify({"success": False, "count": "--", "message": "No image loaded"})
+    result, error = get_analysis()
+    if error is not None:
+        return error
 
-    _, wbc_contours = detect_cells(current_image)
+    count = result["counts"]["wbc"]
+    types = type_summary(result)
 
     return jsonify({
         "success": True,
-        "count": len(wbc_contours),
-        "message": f"Found {len(wbc_contours)} white blood cells"
+        "count": count,
+        "types": types,
+        "message": f"Found {count} white blood cells" + (f": {types}" if types else "")
     })
 
 
-# -------------------------¢
+@app.route("/count-all", methods=["POST"])
+def count_all():
+    result, error = get_analysis()
+    if error is not None:
+        return error
+
+    counts = result["counts"]
+
+    return jsonify({
+        "success": True,
+        "counts": counts,
+        "message": (
+            f"RBC {counts['rbc']}, WBC {counts['wbc']}, "
+            f"platelets {counts['platelet']}, smudge {counts['smudge']}"
+        )
+    })
+
+
+# -------------------------
 # SHOW CELLS
 # -------------------------
 
-@app.route("/show-red", methods=["POST"])
-def show_red():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
+def show_response(classes, filename, message):
+    result, error = get_analysis()
+    if error is not None:
+        return error
 
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=True, show_white=False)
-    image_url = save_result_image(result, "cells_red.jpg")
+    # Drawn on a copy: the boxes are not added to the image history
+    image_url = save_result_image(
+        draw(current_image, result, classes),
+        filename
+    )
 
     return jsonify({
         "success": True,
-        "message": "Showing red blood cells",
+        "message": message,
         "image_url": image_url
     })
+
+
+@app.route("/show-red", methods=["POST"])
+def show_red():
+    return show_response(["rbc"], "cells_red.jpg", "Showing red blood cells")
 
 
 @app.route("/show-white", methods=["POST"])
 def show_white():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=False, show_white=True)
-    image_url = save_result_image(result, "cells_white.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing white blood cells",
-        "image_url": image_url
-    })
+    # smudge cells are shown with the white cells, so the two can be told apart
+    return show_response(["wbc", "smudge"], "cells_white.jpg",
+                         "Showing white blood cells (smudge cells in purple)")
 
 
 @app.route("/show-all", methods=["POST"])
 def show_all():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours)
-    image_url = save_result_image(result, "cells_all.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing all cells",
-        "image_url": image_url
-    })
+    return show_response(["rbc", "wbc", "platelet", "smudge"], "cells_all.jpg",
+                         "Showing all cells")
 
 
 if __name__ == "__main__":
