@@ -209,8 +209,7 @@ def write_csv(path, rows):
         w.writeheader()
         w.writerows(rows)
 
-
-def write_report(check, count_sum, box_sum, type_rows, out="reports"):
+def write_report(check, count_sum, box_sum, type_rows, boxed_sum, out="reports"):
     """reports/eval.md: all tables of the evaluation, ready to read or copy."""
     found, acc, confusion, cal = summarise_types(type_rows)
     L = ["# Evaluation on our own photos (preliminary)", "",
@@ -220,6 +219,15 @@ def write_report(check, count_sum, box_sum, type_rows, out="reports"):
          "| Method | Magnification | Squares | Mean abs. error | Bias | Mean % error | "
          "Total (manual ± √N) |", "|---|---|---|---|---|---|---|"]
     for s in count_sum:
+        L.append(f"| {s['method']} | {s['mag']} | {s['squares']} | {s['mae']:.2f} | "
+                 f"{s['bias']:+.2f} | {s['mape']:.1f}% | {s['total_pred']:.0f} "
+                 f"({s['total_ref']:.0f} ± {np.sqrt(s['total_ref']):.0f}) |")
+    L += ["", "## Red blood cells in the hand-boxed squares only (reference: boxes)", "",
+          "Main result: the 100x check rule failed, so only boxed squares have a reliable "
+          "reference.", "",
+          "| Method | Magnification | Squares | Mean abs. error | Bias | Mean % error | "
+          "Total (manual ± √N) |", "|---|---|---|---|---|---|---|"]
+    for s in boxed_sum:
         L.append(f"| {s['method']} | {s['mag']} | {s['squares']} | {s['mae']:.2f} | "
                  f"{s['bias']:+.2f} | {s['mape']:.1f}% | {s['total_pred']:.0f} "
                  f"({s['total_ref']:.0f} ± {np.sqrt(s['total_ref']):.0f}) |")
@@ -295,7 +303,8 @@ if __name__ == "__main__":
     dets, extra = run_methods(sorted(gt))
     rows = rbc_squares(gt, dets, extra)
     types = wbc_type_rows()
-    write_report(check, summarise_counts(rows), summarise_boxes(rows), types)
+    write_report(check, summarise_counts(rows), summarise_boxes(rows), types,
+                 summarise_counts([r for r in rows if r["boxed"]]))
     write_csv("reports/eval.csv", rows)                 # one row per (method, square)
     write_csv("reports/eval_wbc_types.csv", types)      # one row per white/smudge crop
     print(open("reports/eval.md").read())
