@@ -27,6 +27,11 @@ WBC_TYPES = {"basophil", "eosinophil", "erythroblast", "ig", "lymphocyte", "mono
 PBC_SIZE = 360              # side of a PBC image (px)
 PBC_RBC_RADIUS = 35.4       # red-cell radius in PBC images (median of 300 images)
 MIN_RBC_RADIUS = 20         # below this (40x) the crop would be enlarged too much to type
+# Calibration for phone photos, learned on the train + val photos only (evaluate.py):
+# the PBC-trained model calls lymphocytes "erythroblast". On the test photos: 11/14
+# correct with it, 4/14 without it, 7/14 for always answering "lymphocyte". It can only
+# tell lymphocytes from neutrophils; rarer types are not recognised on phone photos.
+TYPE_CALIBRATION = {"erythroblast": "lymphocyte"}
 
 _cache = {}
 _type_model = None
@@ -59,7 +64,7 @@ def wbc_type(image, box, rbc_radius):
                        abs((b[1] + b[3]) / 2 - PBC_SIZE / 2) < PBC_SIZE / 4)
         if name in WBC_TYPES and near_centre and conf > best_conf:
             best, best_conf = name, conf
-    return best
+    return TYPE_CALIBRATION.get(best, best)
 
 
 def analyse(image):

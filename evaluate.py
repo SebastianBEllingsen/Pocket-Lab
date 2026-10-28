@@ -1,3 +1,19 @@
+"""
+Compare the classical counter and YOLO26 (Stage A, Stage B) on our own test photos.
+
+    python evaluate.py
+
+Ground truth (ground_truth/, made by hand, never used for training)
+  crops.csv      random squares per test photo (scripts/make_count_crops.py) with
+                 rbc_hand = red cells counted by eye (centre inside the square)
+  labels/*.txt   Label Studio YOLO export of boxes drawn on the crop images. Where a
+                 crop has boxes, the box count is the reference instead of rbc_hand
+                 (counting by eye missed ~17 % of the small cells at 40x)
+  classes.txt    class names of that export (Label Studio sorts them alphabetically)
+  wbc_types.csv  hand label of every white / smudge cell crop (scripts/make_wbc_crops.py)
+All boxes are converted to normalised image px (RBC radius 16), the space every
+method works in. Writes reports/eval.md, reports/eval.csv, reports/eval_wbc_types.csv.
+"""
 import csv, glob, os, sys
 from collections import Counter
 import numpy as np
@@ -12,6 +28,9 @@ TEST_DIR = "data/own_v2"
 CLASSES = ["rbc", "wbc", "platelet", "smudge"]           # class ids of the classical counter
 WEIGHTS = {"stageA": "runs/detect/stageA_public/weights/best.pt",   # public data only
            "stageB": "runs/detect/stageB_own/weights/best.pt"}      # + our photos (main model)
+TYPES = ["basophil", "eosinophil", "erythroblast", "ig", "lymphocyte", "monocyte",
+         "neutrophil"]
+PRED_TYPES = "data/wbc_types/predictions.csv"    # written by scripts/make_wbc_crops.py
 
 
 def crop_name(path):
@@ -63,6 +82,7 @@ def load_ground_truth(gt=GT):
     if unused:
         print("label files without a row in crops.csv:", sorted(unused))
     return out
+
 
 def iou(a, b):
     w, h = min(a[2], b[2]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[1], b[1])
@@ -118,9 +138,9 @@ def rbc_squares(gt, dets, extra):
 
 
 def summarise_counts(rows):
-    """Count error per method and magnification. sqrt_ref is the Poisson noise of the
-    reference counts themselves (mean sqrt(N) per square): an MAE below it is within
-    the noise of counting cells in a small square."""
+    """Count error per method and magnification. sqrt_ref is the Poisson uncertainty of
+    the reference counts (mean sqrt(N) per square): how precisely a square's count
+    estimates the cell density of the whole slide, not the error between methods."""
     out = []
     for m in dict.fromkeys(r["method"] for r in rows):
         for mag in ("40x", "100x", "all"):
@@ -146,6 +166,102 @@ def summarise_boxes(rows):
             out.append(dict(method=m, rule=rule, squares=len(rs), ref_boxes=n_ref,
                             precision=tp / max(n_pred, 1), recall=tp / max(n_ref, 1)))
     return out
+
+
+def wbc_type_rows(gt=GT, pred=PRED_TYPES):
+    """One row per white/smudge cell crop: split, what the classical counter called it,
+    the type model's answer and the hand label (ground_truth/wbc_types.csv)."""
+    hand = {r["crop"]: r for r in csv.DictReader(open(os.path.join(gt, "wbc_types.csv")))}
+    return [dict(crop=p["crop"], split=hand[p["crop"]]["split"], found_as=p["found_as"],
+                 predicted=p["predicted"], hand=hand[p["crop"]]["type"])
+            for p in csv.DictReader(open(pred))]
+
+
+def summarise_types(rows):
+    """(1) what the hand labels say about the cells the counter called wbc / smudge,
+    (2) type accuracy on cells that are a white-cell type by the hand label,
+    (3) confusion counts (hand label, model),
+    (4) a calibration learned on the train + val photos only: each model answer is
+        replaced by the hand label it most often meant there. It is scored on the test
+        photos, next to always answering the most common train + val type."""
+    found = {f: Counter(r["hand"] for r in rows if r["found_as"] == f) for f in ("wbc", "smudge")}
+    typed = [r for r in rows if r["found_as"] == "wbc" and r["hand"] in TYPES]
+    acc = {}
+    for name, splits in (("train + val photos", ("train", "val")), ("test photos", ("test",)),
+                         ("all photos", ("train", "val", "test"))):
+        rs = [r for r in typed if r["split"] in splits]
+        acc[name] = (sum(r["predicted"] == r["hand"] for r in rs), len(rs))
+    calib = [r for r in typed if r["split"] != "test"]
+    test = [r for r in typed if r["split"] == "test"]
+    remap = {p: Counter(r["hand"] for r in calib if r["predicted"] == p).most_common(1)[0][0]
+             for p in {r["predicted"] for r in calib}}
+    common = Counter(r["hand"] for r in calib).most_common(1)[0][0]
+    cal = dict(remap=remap, common=common, n=len(test),
+               calibrated=sum(remap.get(r["predicted"], r["predicted"]) == r["hand"] for r in test),
+               baseline=sum(r["hand"] == common for r in test))
+    return found, acc, Counter((r["hand"], r["predicted"]) for r in typed), cal
+
+
+def write_csv(path, rows):
+    keys = list(dict.fromkeys(k for r in rows for k in r))
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def write_report(check, count_sum, box_sum, type_rows, out="reports"):
+    """reports/eval.md: all tables of the evaluation, ready to read or copy."""
+    found, acc, confusion, cal = summarise_types(type_rows)
+    L = ["# Evaluation on our own photos (preliminary)", "",
+         "Made by `evaluate.py`. Ground truth: `ground_truth/` (made by hand, never used "
+         "for training).", "", f"Check of the 100x hand counts: {check}", "",
+         "## Red blood cells per square (12 test photos, 48 squares)", "",
+         "| Method | Magnification | Squares | Mean abs. error | Bias | Mean % error | "
+         "Total (manual ± √N) |", "|---|---|---|---|---|---|---|"]
+    for s in count_sum:
+        L.append(f"| {s['method']} | {s['mag']} | {s['squares']} | {s['mae']:.2f} | "
+                 f"{s['bias']:+.2f} | {s['mape']:.1f}% | {s['total_pred']:.0f} "
+                 f"({s['total_ref']:.0f} ± {np.sqrt(s['total_ref']):.0f}) |")
+    L += ["", "## Red blood cell boxes in the hand-boxed squares", "",
+          "| Method | Matching | Squares | Manual boxes | Precision | Recall |",
+          "|---|---|---|---|---|---|"]
+    for s in box_sum:
+        L.append(f"| {s['method']} | {s['rule']} | {s['squares']} | {s['ref_boxes']} | "
+                 f"{s['precision']:.3f} | {s['recall']:.3f} |")
+    L += ["", "## Cells the classical counter called white / smudge, by hand label "
+          "(all 100x photos)", "",
+          "| Counter said | White cell | Smudge | Not a white cell | Unsure |",
+          "|---|---|---|---|---|"]
+    for f, c in found.items():
+        L.append(f"| {f} | {sum(c[t] for t in TYPES)} | {c['smudge']} | {c['not_wbc']} | "
+                 f"{c['unsure']} |")
+    L += ["", "## White cell types (first-release YOLO11 on PBC-like crops)", "",
+          "Cells the counter called white and the hand label gives a white-cell type. "
+          "The type model never saw our photos.", "",
+          "| Photos | Correct | Accuracy |", "|---|---|---|"]
+    for k, (c, n) in acc.items():
+        L.append(f"| {k} | {c} / {n} | {100 * c / max(n, 1):.0f}% |")
+    preds = sorted({p for _, p in confusion})
+    L += ["", "Rows: hand label, columns: model.", "",
+          "| hand \\ model | " + " | ".join(preds) + " |", "|---|" + "---|" * len(preds)]
+    for h in [t for t in TYPES if any(h == t for h, _ in confusion)]:
+        L.append(f"| {h} | " + " | ".join(str(confusion[(h, p)]) for p in preds) + " |")
+    n = max(cal["n"], 1)
+    L += ["", "Calibration learned on the train + val photos only:", "",
+          "| Model answer | Most often meant (train + val) |", "|---|---|"]
+    L += [f"| {p} | {h} |" for p, h in sorted(cal["remap"].items())]
+    L += ["", "Scored on the test photos:", "", "| Method | Correct | Accuracy |", "|---|---|---|",
+          f"| model, raw | {acc['test photos'][0]} / {cal['n']} | "
+          f"{100 * acc['test photos'][0] / n:.0f}% |",
+          f"| model + calibration | {cal['calibrated']} / {cal['n']} | "
+          f"{100 * cal['calibrated'] / n:.0f}% |",
+          f"| always '{cal['common']}' | {cal['baseline']} / {cal['n']} | "
+          f"{100 * cal['baseline'] / n:.0f}% |"]
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "eval.md"), "w") as f:
+        f.write("\n".join(L) + "\n")
+
 
 def run_methods(images, weights=WEIGHTS, conf=0.25, tmp="data/eval_tmp"):
     """Boxes of every method per test photo, in normalised px:
@@ -174,16 +290,12 @@ if __name__ == "__main__":
     # at most 1.5 cells on average in the boxed 100x squares
     d = [abs(s["rbc_hand"] - s["rbc_ref"]) for i, sqs in gt.items() if "_100x_" in i
          for s in sqs if s["boxed"]]
-    print(f"100x CSV vs boxes: {len(d)} squares, mean |diff| {np.mean(d):.2f} "
-          f"-> {'accepted' if d and np.mean(d) <= 1.5 else 'NOT accepted'}")
+    check = (f"{len(d)} boxed squares, mean |hand - boxes| {np.mean(d):.2f} -> "
+             f"{'accepted' if d and np.mean(d) <= 1.5 else 'NOT accepted'}")
     dets, extra = run_methods(sorted(gt))
     rows = rbc_squares(gt, dets, extra)
-    print("\nRBC count per square (sqrt_ref = Poisson noise of the reference)")
-    for s in summarise_counts(rows):
-        print(f"{s['method']:10s} {s['mag']:5s} n={s['squares']:2d}  MAE {s['mae']:5.2f}  "
-              f"bias {s['bias']:+6.2f}  MAPE {s['mape']:5.1f}%  sqrt_ref {s['sqrt_ref']:4.2f}  "
-              f"total {s['total_pred']:.0f} vs {s['total_ref']:.0f} +/- {np.sqrt(s['total_ref']):.0f}")
-    print("\nRBC boxes in hand-boxed squares")
-    for s in summarise_boxes(rows):
-        print(f"{s['method']:10s} {s['rule']:6s} squares={s['squares']:2d} "
-              f"ref_boxes={s['ref_boxes']}  P {s['precision']:.3f}  R {s['recall']:.3f}")
+    types = wbc_type_rows()
+    write_report(check, summarise_counts(rows), summarise_boxes(rows), types)
+    write_csv("reports/eval.csv", rows)                 # one row per (method, square)
+    write_csv("reports/eval_wbc_types.csv", types)      # one row per white/smudge crop
+    print(open("reports/eval.md").read())
