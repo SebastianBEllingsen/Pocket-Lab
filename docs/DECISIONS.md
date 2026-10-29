@@ -71,6 +71,11 @@
 - Problem found by us: glass fields of the first bank were estimated from 56 own photos, including those. Only colour fields (no cells) were taken, but it still breaks the rule. Fix: `python -m cellcount.synth.bank --backgrounds-only` now skips the held-out photos by default (`--exclude-own`); fields come from 37 photos. The 600-scene dataset used for the first server experiment and the 5,000-scene set built from the old fields (kept as `Data_Sets/synth_out_old_bgs`, not to be shared) were made with the old fields, so the first synthetic-only result (count MAE 4.16) is slightly optimistic and was also measured on test squares; repeat on the validation squares with the clean dataset.
 - The teammate also asked to stop scoring the 48 test squares while trying things; use the 12 validation squares (data/own_val_gt/ on the server, being boxed) to compare versions, score the final choice once on the 16 boxed test squares.
 
+### Experiment 2: public data alone vs public + synthetic (2026-10-29, running on the server)
+- Data: teammate's `merged` (his public Stage A set from TXL-PBC and BBBC041, 1,440 train / 144 val / 133 test tiles, no smudge labels) and our clean synthetic set (5,000 train + 300 val scenes; glass fields without any held-out photo). Copied to `~/synth-detector/{merged,synth_out}`; the earlier contaminated copy is `synth_out_old_bgs` on the server.
+- Runs (identical except data; YOLO26-small, 100 epochs, batch 16, his `train_yolo26.py` with his augmentation, same seed, started together on one V100): A = `merged/train` (`A_public.yaml`), B = `merged/train` + `synth_out/train` (`B_public_synth.yaml`). Choice made on `merged/val`; his 12 validation squares to be added when available; test squares and `merged/test` untouched. Note B has 78% synthetic tiles (5,000 of 6,440); a balanced variant (1,440 synthetic) is possible if B is dominated by synthetic.
+- Results: pending.
+
 ## Open questions
 - Next experiment after the first synthetic-only result (2026-10-29): options 1-4 in PLAN.md "Where we left off (2026-10-29)". Sebastian decides.
 - Handover of a synthetic dataset to the teammate: when, and with what WBC share.
