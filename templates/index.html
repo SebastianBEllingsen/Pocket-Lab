@@ -119,8 +119,12 @@
         </div>
 
     </div>
-            <button onclick="activateZoomIn()">
+        <button onclick="activateZoomIn()">
             🔍 Zoom in
+        </button>
+
+        <button onclick="deactivateZoom(); sendAction('/zoom-out')">
+            🔍 Zoom out
         </button>
     </div>
 
@@ -377,8 +381,6 @@
                     </strong>
                 </div>
 
-                <!-- White cell types, e.g. "2 neutrophil, 1 lymphocyte" -->
-                <p id="white-types"></p>
 
             </div>
 
@@ -419,7 +421,7 @@
                     Analysis Results
                 </h3>
 
-                <p>
+                <p id="analysis-results">
                     Image analysis results will appear here.
                 </p>
 

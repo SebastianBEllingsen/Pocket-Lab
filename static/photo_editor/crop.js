@@ -164,36 +164,43 @@ async function applyCrop() {
     const width = Math.round(displayWidth * scaleX);
     const height = Math.round(displayHeight * scaleY);
 
+    try {
 
-    // Send crop coordinates to Flask
-    const response = await fetch("/crop", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            x: x,
-            y: y,
-            width: width,
-            height: height
-        })
-    });
+        // Send crop coordinates to Flask
+        const response = await fetch("/crop", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                x: x,
+                y: y,
+                width: width,
+                height: height
+            })
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (data.success) {
+        if (data.success) {
 
-        image.src = data.image_url + "?t=" + new Date().getTime();
+            image.src = data.image_url + "?t=" + new Date().getTime();
 
-        overlay.style.display = "none";
-        document.querySelector(".crop-actions").style.display = "none";
+            overlay.style.display = "none";
+            document.querySelector(".crop-actions").style.display = "none";
 
-        showNotification("Image cropped successfully");
+            // Release Crop tool
+            deactivateTool("crop");
+        }
 
-    // Release Crop tool
-    deactivateTool("crop");
+        // On failure the overlay stays open, so the user can adjust it or cancel
+        showNotification(data.message);
 
-    showNotification("Image cropped successfully");
+    } catch (error) {
+
+        console.error(error);
+
+        showNotification("Crop failed.");
     }
 }
 

@@ -4,7 +4,9 @@ import cv2
 def add_text(image, text, x, y, size, color):
 
     font = cv2.FONT_HERSHEY_SIMPLEX
-    thickness = 1
+
+    # Line width grows with the text size, so text stays readable on large photos
+    thickness = max(1, round(size * 1.5))
 
     # Maximum width available for the text
     max_width = image.shape[1] - x - 10

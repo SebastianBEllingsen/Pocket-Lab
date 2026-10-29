@@ -286,7 +286,7 @@ async function applyText() {
                 text: text,
                 x: x,
                 y: y,
-                size: textSize,
+                size: textSize * scaleY,
                 color: color
             })
         });
