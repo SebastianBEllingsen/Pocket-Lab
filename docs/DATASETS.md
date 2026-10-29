@@ -41,6 +41,11 @@ The datasets are not final. Replace or add as needed. Root: `Data_Sets/` (git-ig
 - `synth_handover.zip` (401 MB): the clean `synth_out` (5,000 train + 300 val scenes, glass fields only from photos outside the teammate's validation/test lists) plus `README_dataset.txt` (source: `docs/handover/README_dataset.txt`), made for the teammate on 2026-10-29. `synth_out_old_bgs/` is the earlier set whose glass fields used held-out photos: do not share.
 - `synth_out/`: synthetic YOLO dataset in the teammate's format (classes 0 rbc, 1 wbc, 2 platelet, 3 smudge), with `wbc_types.csv` and `manifest.csv`. Build: `python -m cellcount.synth --n 300 --seed 1 --out Data_Sets/synth_out --split train`.
 
+## Teammate's working data (`Data_Sets/colleague_data/data/`, from his `data.zip`, 2026-10-29; git-ignored)
+- `merged/`: his public "Stage A" training set, already normalised (red-cell radius 16 px, 640 px tiles): train 1,440 / val 144 / test 133 tiles from TXL-PBC (MIT; 881 train images) and BBBC041 (CC BY-NC-SA; 1,089 train images). Boxes train: 116,252 rbc, 3,720 wbc, 1,528 platelet, **0 smudge** (the real data has no smudge class; only synthetic data provides it). `manifest.csv` gives source, split and scale per image.
+- `own_v2_yolo/`: tiles of his own phone photos with classical-counter pseudo-labels (train 202 tiles from 19 photos, val 84 from the 6 validation photos, test 100 from the 12 test photos). Pseudo-labels leave clumped cells unlabelled, so they are weak ground truth.
+- `own_gt/`, `own_gt_size192/`: his hand-counted test squares and crops. Never used for training or tuning. `wbc_types/`, `own_v2_yolo_v1`, `own_v2_yolo_crashed`: earlier artefacts.
+
 ## Notes
 - Stain, background and zoom differ strongly between Data_Set_1 and BCCD (see IDEAS.md section 4).
 - No dataset has instance masks separating overlapping cells. The overlap method has to supply that.
