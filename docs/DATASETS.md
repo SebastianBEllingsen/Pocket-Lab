@@ -38,6 +38,7 @@ The datasets are not final. Replace or add as needed. Root: `Data_Sets/` (git-ig
 
 ## Generated data (git-ignored, under `Data_Sets/`)
 - `synth_bank/`: cut-out bank (`rbc_*.png`, `wbc_*.png`, `platelet_*.png` as BGRA, `index.json`), glass fields (`bg_*.png`, `bg_index.json`) and contact sheets (`sheet_*.png`). Build: `python -m cellcount.synth.bank --sheets --stats`.
+- `synth_handover.zip` (401 MB): the clean `synth_out` (5,000 train + 300 val scenes, glass fields only from photos outside the teammate's validation/test lists) plus `README_dataset.txt` (source: `docs/handover/README_dataset.txt`), made for the teammate on 2026-10-29. `synth_out_old_bgs/` is the earlier set whose glass fields used held-out photos: do not share.
 - `synth_out/`: synthetic YOLO dataset in the teammate's format (classes 0 rbc, 1 wbc, 2 platelet, 3 smudge), with `wbc_types.csv` and `manifest.csv`. Build: `python -m cellcount.synth --n 300 --seed 1 --out Data_Sets/synth_out --split train`.
 
 ## Notes

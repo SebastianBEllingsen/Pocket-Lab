@@ -62,6 +62,7 @@ Where we left off (2026-10-27): bank (9,595 cut-outs: 6,318 red cells, 420-446 p
 - Experiment (server, see docs/SERVER.md): YOLO26n trained on 600 synthetic scenes only, scored on the teammate's 48 hand-counted real squares: count MAE 4.16 vs 3.64 for his classical counter, box precision/recall at IoU 0.5 0.78/0.75 vs 0.74/0.62 (details in DECISIONS.md). Undercounts about 10% at 100x; predicted red-cell boxes are 37 px against 32 px hand boxes.
 
 ## Where we left off (2026-10-29)
+0. Latest: clean dataset (5,000 train + 300 val, 1.06 M rbc / 7.7k wbc / 20k platelet / 5.0k smudge boxes) zipped for the teammate (`Data_Sets/synth_handover.zip`, 401 MB). Next: repeat the server experiment on the clean data, scored on his 12 validation squares (not the test squares); ask Sebastian before starting.
 1. Waiting for Sebastian to choose the next experiment (he asked to be consulted before runs):
    - option 1: 5,000 scenes + YOLO26s, about 100 epochs (cheap, shows whether data volume closes the gap); recommended first;
    - option 2: realism gap (softer edges and sizes; target the 37 vs 32 px boxes and the 100x undercount);
