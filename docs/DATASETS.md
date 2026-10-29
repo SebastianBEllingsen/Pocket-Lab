@@ -31,6 +31,15 @@ The datasets are not final. Replace or add as needed. Root: `Data_Sets/` (git-ig
 - Use: WBC subtype classifier (all five subtypes, with far more basophils, lymphocytes and monocytes than BCCD), plus single-cell cut-outs for the synthetic generator. Not for counting or zoom invariance (one fixed zoom, one cell per image, CellaVision stain).
 - Caveat: different scanner, stain and background than BCCD, so a classifier trained on PBC alone may not transfer to BCCD-style images; test cross-dataset.
 
+## Own phone/eyepiece photos (the target look)
+- Path: `Data_Sets/own_v2/own_v2/` (unzipped from `own_v2.zip`, git-ignored). 63 photos `unk_40x_*.jpg` and `unk_100x_*.jpg` plus a few `blood_cell*.jpg`, 2880x2160, a bright circle (eyepiece view) inside a dark rim, yellow/orange/pink glass, faint low-contrast red cells, strong vignette, sometimes a dark shadow across the circle.
+- Used for: glass-colour fields of the synthetic scenes (stage 1 estimates them), visual comparison, and the teammate's evaluation (his 48 hand-counted squares live in his branch under `ground_truth/`). Not used for cutting cells out (cells too faint for stage 1).
+- The circle finder (`--fov auto`) finds the circle in 62 of the 63 photos; `unk_100x_10` fails (large shadow).
+
+## Generated data (git-ignored, under `Data_Sets/`)
+- `synth_bank/`: cut-out bank (`rbc_*.png`, `wbc_*.png`, `platelet_*.png` as BGRA, `index.json`), glass fields (`bg_*.png`, `bg_index.json`) and contact sheets (`sheet_*.png`). Build: `python -m cellcount.synth.bank --sheets --stats`.
+- `synth_out/`: synthetic YOLO dataset in the teammate's format (classes 0 rbc, 1 wbc, 2 platelet, 3 smudge), with `wbc_types.csv` and `manifest.csv`. Build: `python -m cellcount.synth --n 300 --seed 1 --out Data_Sets/synth_out --split train`.
+
 ## Notes
 - Stain, background and zoom differ strongly between Data_Set_1 and BCCD (see IDEAS.md section 4).
 - No dataset has instance masks separating overlapping cells. The overlap method has to supply that.

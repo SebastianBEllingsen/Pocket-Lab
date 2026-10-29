@@ -74,3 +74,6 @@ Early stage. Stage 1 is built and awaiting review (mean IoU about 0.89 on Data_S
 
 ## Version control
 Local git, committed regularly. We do not push automatically. `Data_Sets/`, `runs/` and model weights (`*.pt`) are git-ignored.
+
+## Training server and experiments
+Detector experiments with the synthetic data run on the university Coder server, from a checkout of the teammate's branch. Setup, commands and gotchas: [docs/SERVER.md](docs/SERVER.md). Results and reasoning: [docs/DECISIONS.md](docs/DECISIONS.md).

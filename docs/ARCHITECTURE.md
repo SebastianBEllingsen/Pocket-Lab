@@ -38,6 +38,8 @@ tests/test_synth.py                 tiny in-memory bank tests
 ```
 Flow: public datasets -> bank (cut-outs at RBC radius 32 px, glass fields) in `Data_Sets/synth_bank` -> scenes (640 px, RBC radius 16 px) -> YOLO folder for the teammate. Detector classes: 0 rbc, 1 wbc, 2 platelet, 3 smudge; WBC subtype goes to the sidecar.
 
+Experiments run outside this repository: the teammate's branch is checked out as a git worktree (`../Course-Project-detector`) and mirrored on the training server (see SERVER.md).
+
 ## Proposed layout (later stages, not built)
 ```
 cellcount/

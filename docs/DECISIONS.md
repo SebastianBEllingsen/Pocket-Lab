@@ -67,6 +67,9 @@
   - Reading: with no real labels at all, 600 scenes and 40 epochs of the nano model already come close to the classical counter and beat it on box recall at IoU 0.5. Not yet tried: more scenes, larger model, more epochs, adding real labels, smudge/platelet/WBC scoring (his evaluate.py scores red cells only).
 
 ## Open questions
+- Next experiment after the first synthetic-only result (2026-10-29): options 1-4 in PLAN.md "Where we left off (2026-10-29)". Sebastian decides.
+- Handover of a synthetic dataset to the teammate: when, and with what WBC share.
+- Process (Sebastian, 2026-10-29): consult before starting runs, installs, copies or server work; the first local training and the install were started without asking and he objected. Local run stopped; server used from then on, with each step proposed first.
 - Overlap idea as training-data preprocessing vs. an inference-time step (discussed; leaning: build and validate the splitter first, then decide; BCCD boxes and synthetic data give the validation).
 - Data_Set_2 classification split leakage: check was inconclusive, see DATASETS.md. Decide whether to build our own split by BCCD original.
 - PBC downloaded by Sebastian as Data_Set_3 and extracted (2026-10-11). Other candidate datasets still need his okay.

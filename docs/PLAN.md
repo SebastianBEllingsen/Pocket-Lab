@@ -54,6 +54,23 @@ Where we left off (2026-10-27): bank (9,595 cut-outs: 6,318 red cells, 420-446 p
 - Not yet signed off: Sebastian has not yet looked at the viewer output (he wants to read the code and methods first). Per the confer-at-every-step rule, stage 1 is not "done" until he gives a verdict.
 - Old experiments (`main.py` watershed, `model.py` YOLO11n-cls with one incomplete run in `runs/`) are untouched; do not trust the 0.90 top-1 from that run until the Data_Set_2 split leakage question is settled.
 
+## Current status (2026-10-29)
+- Scope: synthetic training data for the teammate's YOLO detector (see "Revised scope" above). Stage 1 background removal is signed off (`lower` threshold, circle shrink 0.95); cut-out bank, generator and YOLO export are built (`cellcount/synth/`), 15 tests pass, about 20 local commits, nothing pushed.
+- Bank: 9,595 cut-outs (6,318 red cells, 420-446 per WBC type, 297 platelets) plus 101 glass fields (56 from the own photos). Smudges are generated.
+- Generator: optical-density blending (overlaps darken), per-scene stain, three layouts (random, packed, clumps), teammate's counting-circle rim rule, blur/noise/JPEG. Sebastian's verdict on the scenes: "very good, I would have thought it was real", some scenes too clustered (addressed by the layout mix and lower density).
+- Sample dataset: `Data_Sets/synth_out` (600 train + 60 val scenes, git-ignored).
+- Experiment (server, see docs/SERVER.md): YOLO26n trained on 600 synthetic scenes only, scored on the teammate's 48 hand-counted real squares: count MAE 4.16 vs 3.64 for his classical counter, box precision/recall at IoU 0.5 0.78/0.75 vs 0.74/0.62 (details in DECISIONS.md). Undercounts about 10% at 100x; predicted red-cell boxes are 37 px against 32 px hand boxes.
+
+## Where we left off (2026-10-29)
+1. Waiting for Sebastian to choose the next experiment (he asked to be consulted before runs):
+   - option 1: 5,000 scenes + YOLO26s, about 100 epochs (cheap, shows whether data volume closes the gap); recommended first;
+   - option 2: realism gap (softer edges and sizes; target the 37 vs 32 px boxes and the 100x undercount);
+   - option 3: make smudge and platelet learnable (more and better smudges) and extend the evaluation to wbc/platelet/smudge with his hand boxes;
+   - option 4: mix in the teammate's real labelled data (not in the repo; needs his data).
+2. Open questions: the exact WBC share wanted in the handover set (default 1.5 WBC per tile; `--wbc-mean` raises it); whether to hand over now or after more tuning.
+3. Known weak spots: a few WBC cut-outs carry scraps of neighbouring red cells; smudges are not learned after 40 epochs; own photos have faint cells so stage 1 cannot cut cells out of them; the teammate's own detector weights are not available for comparison.
+4. Not yet tried: Poisson blending, SAM-based cut-outs, generative models, per-class scoring on real photos.
+
 ## Where we left off (2026-10-11)
 1. Waiting for Sebastian's verdict on stage 1. He should run:
    - `python -m cellcount.bg_removal --full --worst 6 --stats`
