@@ -49,7 +49,7 @@ class SceneTest(unittest.TestCase):
 
     def test_overlap_is_darker_than_single_cell(self):
         cfg = SceneConfig(coverage=(0.9, 0.9), min_dist=(0.3, 0.3), wbc_mean=0, platelet_mean=0, smudge_mean=0,
-                          rim_prob=0.0, noise_sigma=(0, 0), blur_sigma=(0.1, 0.1))
+                          rim_prob=0.0, noise_sigma=(0, 0), blur_sigma=(0.1, 0.1), debris=(0, 0), pale_frac=0.0)
         dense = generate_scene(tiny_bank(), cfg, np.random.default_rng(2)).image.mean()
         sparse = generate_scene(tiny_bank(), SceneConfig(**{**cfg.__dict__, "coverage": (0.1, 0.1), "min_dist": (1.0, 1.0)}),
                                 np.random.default_rng(2)).image.mean()
@@ -60,6 +60,12 @@ class SceneTest(unittest.TestCase):
         sc = generate_scene(tiny_bank(), cfg, np.random.default_rng(5))
         self.assertTrue(sc.params["rim"])
         self.assertGreater((sc.image.max(axis=2) < 10).mean(), 0.02)   # a black area outside the circle
+
+    def test_debris_is_not_labelled(self):
+        base = dict(wbc_mean=0, platelet_mean=0, smudge_mean=0, rim_prob=0.0, coverage=(0.3, 0.3), noise_sigma=(0, 0))
+        dirty = generate_scene(tiny_bank(), SceneConfig(**base, debris=(100, 100)), np.random.default_rng(6))
+        self.assertTrue(all(b[0] == 0 for b in dirty.boxes))       # only red cells are labelled
+        self.assertGreater(len(dirty.boxes), 10)                   # the red cells themselves are still labelled
 
     def test_yolo_export(self):
         sc = generate_scene(tiny_bank(), SceneConfig(wbc_types=("neutrophil",)), np.random.default_rng(4))

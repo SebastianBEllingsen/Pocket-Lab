@@ -14,6 +14,8 @@ Public API
     make_smudge(rng, radius)    procedural pale, ragged smudge cell (a Cutout)
     generate_scene(bank, cfg, rng) -> Scene
 
+Distractors (v2, 2026-10-29): unlabelled debris dots and pale labelled red cells teach the model what is NOT a platelet or smudge.
+
 Box convention (teammate, confirmed 2026-10-27): tight box around the whole cell outline (WBC with cytoplasm,
 platelet around the dot, smudge around the pale patch), clipped to the tile; cells less than half visible or
 smaller than 6 px are not labelled. Rim rule: outside the counting circle (count_frac x eyepiece radius minus one
@@ -46,8 +48,12 @@ class SceneConfig:
     size_jitter: float = 0.10              # per-cell size variation
     zoom_jitter: float = 0.08              # per-tile size variation of everything
     wbc_mean: float = 1.5                  # white cells per tile (Poisson mean)
-    platelet_mean: float = 4.0
-    smudge_mean: float = 1.0
+    platelet_mean: float = 2.0             # was 4.0 in the first dataset; real 40x photos have few platelets
+    smudge_mean: float = 0.6               # was 1.0
+    debris: tuple[int, int] = (10, 120)    # unlabelled small dark dots per tile (stain granules, dust): hard negatives for platelet
+    debris_radius: tuple[float, float] = (0.08, 0.3)   # as a fraction of the red-cell radius
+    debris_od: tuple[float, float] = (0.15, 0.6)
+    pale_frac: float = 0.12                # share of red cells drawn pale (labelled rbc): hard negatives for smudge
     wbc_types: tuple[str, ...] = WBC_TYPES
     stain_strength: tuple[float, float] = (0.7, 1.3)
     tint_sigma: float = 0.12               # per-channel stain hue jitter
@@ -211,6 +217,18 @@ def _layout(kind: str, n: int, size: int, R: float, min_d: float, rng: np.random
     return _positions(n, size, min_d, rng, -0.5 * R, size + 0.5 * R)
 
 
+def _stamp(od: np.ndarray, cx: float, cy: float, r: float, amp: float, colour: np.ndarray) -> None:
+    """Add a soft round dot of optical density to ``od`` (canvas coordinates)."""
+    k = int(4 * r) | 1
+    x0, y0 = int(round(cx)) - k // 2, int(round(cy)) - k // 2
+    sx0, sy0, sx1, sy1 = max(0, -x0), max(0, -y0), min(k, od.shape[1] - x0), min(k, od.shape[0] - y0)
+    if sx1 <= sx0 or sy1 <= sy0:
+        return
+    yy, xx = np.mgrid[:k, :k] - k // 2
+    g = np.exp(-(xx ** 2 + yy ** 2) / (2 * (r / 1.4) ** 2)).astype(np.float32)
+    od[y0 + sy0:y0 + sy1, x0 + sx0:x0 + sx1] += (amp * g[sy0:sy1, sx0:sx1, None]) * colour
+
+
 def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Scene:
     S, m = cfg.tile, cfg.margin
     size = S + 2 * m
@@ -233,6 +251,8 @@ def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Sc
         if radius is not None:         # size by target radius (platelets: the bank's are big thrombocytes)
             s = radius / max(float(np.sqrt((c.alpha > 128).sum() / np.pi)), 1.0)
         target = scene_od * float(np.exp(rng.normal(0, cfg.rbc_od_jitter))) if cid == 0 else None
+        if cid == 0 and rng.random() < cfg.pale_frac:
+            target *= rng.uniform(0.35, 0.6)
         o, a = _warp(c, s, rng.uniform(0, 360), bool(rng.random() < 0.5), target, rbc_stain if cid == 0 else None)
         h, w = a.shape
         x0, y0 = int(round(cx - w / 2)) + m, int(round(cy - h / 2)) + m
@@ -259,6 +279,11 @@ def generate_scene(bank: Bank, cfg: SceneConfig, rng: np.random.Generator) -> Sc
             put(bank.platelet[int(rng.integers(len(bank.platelet)))], x, y, 2, None, 0.0, R * rng.uniform(*cfg.platelet_radius))
     for x, y in _positions(rng.poisson(cfg.smudge_mean), S, 2 * R, rng, 0.0, S):
         put(make_smudge(rng), x, y, 3, None)
+
+    debris_colour = np.array([0.7, 0.85, 0.55], np.float32) * np.exp(rng.normal(0, 0.1, 3)).astype(np.float32)
+    for _ in range(int(rng.integers(cfg.debris[0], cfg.debris[1] + 1))):
+        _stamp(od, rng.uniform(0, S) + m, rng.uniform(0, S) + m, R * rng.uniform(*cfg.debris_radius),
+               rng.uniform(*cfg.debris_od), debris_colour)
 
     strength = rng.uniform(*cfg.stain_strength)
     tint = np.exp(rng.normal(0, cfg.tint_sigma, 3)).astype(np.float32)
