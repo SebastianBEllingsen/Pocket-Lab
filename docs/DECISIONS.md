@@ -81,6 +81,11 @@
   - Likely causes (not yet tested): synthetic platelets/smudges/WBC sit in clean surroundings while real 40x photos have many small dark dots and pale cells that are unlabelled debris, so the model has never seen hard negatives; the synthetic share is 78% of B; real photos have different rare-class statistics. Honest status: without hand counts we cannot say whether B's extra red cells are real; the validation squares decide.
   - Next candidates (not started, Sebastian decides): (a) a balanced mix (about 1,440 synthetic scenes); (b) distractors in the generator (small dark dots and pale cells without labels, as hard negatives); (c) per-class confidence thresholds; (d) lower platelet/smudge rates; (e) rerun A and B scored on the 12 validation squares as soon as the teammate has boxed them.
 
+### Experiment 3: hard negatives and balance (2026-10-29, running unattended on the server)
+- Generator v2 (commit "synth: debris dots and pale red cells..."): unlabelled debris dots (10-120 per tile), 12% pale red cells labelled rbc, platelets 4.0 -> 2.0 and smudges 1.0 -> 0.6 per tile. Aim: stop the false platelet/smudge/WBC detections seen in experiment 2.
+- Runs, same recipe as A and B (YOLO26-small, 100 epochs, batch 16, public `merged/train` always included): C = + all 5,000 v2 scenes; D = + 1,440 v2 scenes; E = + 1,440 v1 scenes (separates "less synthetic data" from "hard negatives"). Scored on `merged/val` and on the six validation photos (counts per class, classical counter as a reference only); no test photo or square used. Final judgement waits for the teammate's validation squares.
+- Results: pending (`~/synth-detector/results_exp3_*.txt`).
+
 ## Open questions
 - Next experiment after the first synthetic-only result (2026-10-29): options 1-4 in PLAN.md "Where we left off (2026-10-29)". Sebastian decides.
 - Handover of a synthetic dataset to the teammate: when, and with what WBC share.
