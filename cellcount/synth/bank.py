@@ -19,6 +19,8 @@ Flags
     --pbc-per-class N    PBC images tried per class (default 120)
     --backgrounds N      glass fields per public dataset (default 15); own photos are all used (--own-photos)
     --own-photos DIR     folder with the real photos (default <data root>/own_v2/own_v2)
+    --exclude-own A,B    own photos whose glass colours are NOT used (default: the teammate's validation and test photos)
+    --backgrounds-only   rebuild only the glass fields, keep the cut-outs already in the bank
     --seed N             random seed (default 0)
     --no-pbc-rbc         do not take red cells from PBC images (they have a pale centre, unlike Data_Set_1)
     --sheets             also write contact sheets (sheet_<class>.png) into the bank folder
@@ -40,6 +42,11 @@ from ..common.datasets import get_dataset, resolve_data_root
 from dataclasses import replace
 
 from .cutouts import BANK_R, Cutout, extract_central, extract_neighbour_rbcs, extract_rbcs, save_bank
+
+# The teammate's validation and test photos must never reach any training data, synthetic included
+# (rule from him, 2026-10-29): their glass colours are therefore not used for the glass fields.
+HELD_OUT_PHOTOS = ("unk_40x_01", "unk_40x_02", "unk_40x_03", "unk_100x_01", "unk_100x_02", "unk_100x_03",
+                   "unk_40x_08", "unk_40x_09", "unk_40x_10") + tuple(f"unk_100x_{k}" for k in range(17, 27))
 
 PBC_WBC = ("neutrophil", "eosinophil", "basophil", "lymphocyte", "monocyte", "ig", "erythroblast")
 
@@ -76,7 +83,8 @@ def build_bank(root: Path, rbc_images: int, rbc_per_image: int, pbc_per_class: i
     return cutouts, tried
 
 
-def build_backgrounds(root: Path, own_dir: Path, per_dataset: int, seed: int, size: int = 64) -> tuple[list[np.ndarray], list[dict]]:
+def build_backgrounds(root: Path, own_dir: Path, per_dataset: int, seed: int, size: int = 64,
+                      exclude: tuple[str, ...] = HELD_OUT_PHOTOS) -> tuple[list[np.ndarray], list[dict]]:
     """Small glass-colour fields (BGR uint8, size x size) and their origin records."""
     rng = np.random.default_rng(seed)
     cfg = BgConfig()
@@ -87,6 +95,8 @@ def build_backgrounds(root: Path, own_dir: Path, per_dataset: int, seed: int, si
         info.append(dict(source=source, kind=kind))
 
     for f in sorted(own_dir.glob("unk_*.jpg")) if own_dir.exists() else []:
+        if f.stem in exclude:
+            continue
         res = remove_background(cv.imread(str(f)), cfg)
         if res.fov is None:
             continue
@@ -129,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--pbc-per-class", type=int, default=120)
     p.add_argument("--backgrounds", type=int, default=15)
     p.add_argument("--own-photos", default=None)
+    p.add_argument("--exclude-own", default=",".join(HELD_OUT_PHOTOS))
+    p.add_argument("--backgrounds-only", action="store_true", help="rebuild only the glass fields")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--no-pbc-rbc", action="store_true", help="skip red cells from PBC images")
     p.add_argument("--sheets", action="store_true", help="write contact sheets into the bank folder")
@@ -137,15 +149,19 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
     root = resolve_data_root(a.data_root)
     out = Path(a.out) if a.out else root / "synth_bank"
-    cutouts, tried = build_bank(root, a.rbc_images, a.rbc_per_image, a.pbc_per_class, a.seed, not a.no_pbc_rbc)
-    save_bank(cutouts, out)
-    fields, info = build_backgrounds(root, Path(a.own_photos) if a.own_photos else root / "own_v2" / "own_v2", a.backgrounds, a.seed)
+    cutouts, tried = ([], Counter()) if a.backgrounds_only else build_bank(root, a.rbc_images, a.rbc_per_image, a.pbc_per_class, a.seed, not a.no_pbc_rbc)
+    if not a.backgrounds_only:
+        save_bank(cutouts, out)
+    for old in list(out.glob("bg_*.png")):
+        old.unlink()
+    fields, info = build_backgrounds(root, Path(a.own_photos) if a.own_photos else root / "own_v2" / "own_v2", a.backgrounds, a.seed,
+                                    exclude=tuple(n for n in a.exclude_own.split(",") if n))
     for k, (f, e) in enumerate(zip(fields, info)):
         e["file"] = f"bg_{k:03d}.png"
         cv.imwrite(str(out / e["file"]), f)
     (out / "bg_index.json").write_text(json.dumps(info, indent=1))
     print(f"saved {len(fields)} background fields ({sum(e['kind'] == 'own' for e in info)} from own photos)")
-    print(f"saved {len(cutouts)} cut-outs to {out}")
+    print(f"saved {len(cutouts)} cut-outs to {out}" if not a.backgrounds_only else "cut-outs unchanged")
     if a.stats:
         kept = Counter((c.subtype or c.cls) for c in cutouts)
         for k in sorted(kept):

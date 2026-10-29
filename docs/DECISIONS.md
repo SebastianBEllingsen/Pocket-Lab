@@ -66,6 +66,11 @@
   - Box size: hand-drawn RBC boxes are 32 px (median), our synthetic training boxes 32 px, but predicted boxes on real photos 37 px (classical 39 px). The earlier worry "23 px" was a wrong crop-size assumption of ours; radius 16 / 32 px boxes are correct.
   - Reading: with no real labels at all, 600 scenes and 40 epochs of the nano model already come close to the classical counter and beat it on box recall at IoU 0.5. Not yet tried: more scenes, larger model, more epochs, adding real labels, smudge/platelet/WBC scoring (his evaluate.py scores red cells only).
 
+### Correction: glass fields must not come from held-out photos (2026-10-29)
+- Rule from the teammate: none of the validation or test photos (or their squares) may enter any training data, synthetic included. Validation: unk_40x_01-03, unk_100x_01-03. Test: unk_40x_08-10, unk_100x_17-26 (23 not used).
+- Problem found by us: glass fields of the first bank were estimated from 56 own photos, including those. Only colour fields (no cells) were taken, but it still breaks the rule. Fix: `python -m cellcount.synth.bank --backgrounds-only` now skips the held-out photos by default (`--exclude-own`); fields come from 37 photos. The 600-scene dataset used for the first server experiment and the 5,000-scene set built from the old fields (kept as `Data_Sets/synth_out_old_bgs`, not to be shared) were made with the old fields, so the first synthetic-only result (count MAE 4.16) is slightly optimistic and was also measured on test squares; repeat on the validation squares with the clean dataset.
+- The teammate also asked to stop scoring the 48 test squares while trying things; use the 12 validation squares (data/own_val_gt/ on the server, being boxed) to compare versions, score the final choice once on the 16 boxed test squares.
+
 ## Open questions
 - Next experiment after the first synthetic-only result (2026-10-29): options 1-4 in PLAN.md "Where we left off (2026-10-29)". Sebastian decides.
 - Handover of a synthetic dataset to the teammate: when, and with what WBC share.
