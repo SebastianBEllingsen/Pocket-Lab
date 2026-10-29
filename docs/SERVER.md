@@ -48,7 +48,7 @@ The local copy of the teammate's branch is a git worktree: `git worktree add --d
 - Nothing is pushed anywhere; results are written down in `docs/DECISIONS.md`.
 
 ## Unattended jobs (no tmux on the server)
-- Long jobs are started with `nohup ... &`. They keep running when the laptop sleeps or the connection drops (checked 2026-10-29). Only steps driven from a Claude session need the laptop online, so whole chains are written as one server-side script.
+- Long jobs are started with `nohup ... &`. They keep running when the laptop sleeps or the connection drops (checked 2026-10-29). Only steps driven interactively from the laptop need it online, so whole chains are written as one server-side script.
 - Heavy work (data generation and training) runs on the server, not on the laptop (fans, battery). Generation is sharded: `python -m cellcount.synth --n 625 --seed 11 --start $((k*625)) --out ../v2_parts/p$k` for k = 0..7 gives the same scenes as one run (scene k uses seed `[seed, start+k]`). The code and bank live in `~/synth-detector/gen`.
 - Experiment 3 script: `~/synth-detector/pipeline_exp3.sh` (copy in `docs/handover/pipeline_exp3.sh`). It waits for generation, merges shards into `synth_v2/`, trains runs C, D and E concurrently, scores A-E on the six validation photos and writes `results_exp3_val_photos.txt`, `results_exp3_public_val.txt` and `ann_*/unk_40x_02_yolo.jpg`. Progress: `cat ~/synth-detector/pipeline_exp3.log`.
 - Check from anywhere on the university network: `coder ssh fuckthisshit -- 'cat ~/synth-detector/pipeline_exp3.log; tail -n 30 ~/synth-detector/results_exp3_val_photos.txt'`.
