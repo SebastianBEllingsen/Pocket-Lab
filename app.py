@@ -142,10 +142,9 @@ def save_image():
 
 @app.route("/reset", methods=["POST"])
 def reset():
+    global current_image, original_image
+    global image_history, current_index, zoom_level
 
-    global current_image, original_image, image_history, current_index
-
-    # Check if an original image exists
     if original_image is None:
         return jsonify({
             "success": False,
@@ -154,12 +153,15 @@ def reset():
 
     # Restore the original image
     current_image = original_image.copy()
+    zoom_level = 100.0
 
-    # Reset image history
-    image_history = [current_image.copy()]
+    # Initialize the history with the original image
+    image_history = [{
+        "image": current_image.copy(),
+        "zoom": zoom_level
+    }]
     current_index = 0
 
-    # Save the reset image
     image_url = save_result_image(
         current_image,
         "reset_image.jpg"
@@ -168,10 +170,9 @@ def reset():
     return jsonify({
         "success": True,
         "message": "Image reset successfully",
-        "image_url": image_url
+        "image_url": image_url,
+        "zoom": zoom_level
     })
-
-
 
 # -------------------------
 # TOOLS
