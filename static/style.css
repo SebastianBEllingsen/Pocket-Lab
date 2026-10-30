@@ -1032,16 +1032,27 @@ button:active {
     display: none;
 }
 
-.shape-actions {
+
+
+.tool-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-top: 12px;
+    line-height: normal;
+}
+
+.tool-actions .crop-actions,
+.tool-actions .shape-actions,
+.tool-actions .text-controls {
     display: none;
-
-    position: absolute;
-    bottom: 10px;
-    left: 50%;
-
-    transform: translateX(-50%);
-
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: 10px;
-
-    z-index: 20;
+    width: 100%;
+    margin-top: 0;
+    box-sizing: border-box;
 }
