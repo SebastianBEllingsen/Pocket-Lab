@@ -396,7 +396,7 @@ async function applyShape() {
 
         color: [0, 0, 255],
 
-        thickness: 2
+        thickness: Math.max(2, Math.round(2 * scaleX))
     };
 
 

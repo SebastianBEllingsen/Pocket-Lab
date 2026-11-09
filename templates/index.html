@@ -119,8 +119,12 @@
         </div>
 
     </div>
-            <button onclick="activateZoomIn()">
+        <button onclick="activateZoomIn()">
             🔍 Zoom in
+        </button>
+
+        <button onclick="deactivateZoom(); sendAction('/zoom-out')">
+            🔍 Zoom out
         </button>
     </div>
 
@@ -324,11 +328,18 @@
                 🔴 Count Red Cells
             </button>
 
-            <button
+                        <button
                 class="analysis-button white-button"
                 onclick="countCells('/count-white', 'white-count')"
             >
                 ⚪ Count White Cells
+            </button>
+
+            <button
+                class="analysis-button"
+                onclick="countAll()"
+            >
+                🔬 Count All Cells
             </button>
 
 
@@ -353,6 +364,27 @@
                         --
                     </strong>
                 </div>
+
+                <div>
+                    <span>
+                        Platelets
+                    </span>
+
+                    <strong id="platelet-count">
+                        --
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        Smudge Cells
+                    </span>
+
+                    <strong id="smudge-count">
+                        --
+                    </strong>
+                </div>
+
 
             </div>
 
@@ -393,7 +425,7 @@
                     Analysis Results
                 </h3>
 
-                <p>
+                <p id="analysis-results">
                     Image analysis results will appear here.
                 </p>
 

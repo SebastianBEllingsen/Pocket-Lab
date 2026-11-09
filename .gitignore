@@ -6,6 +6,11 @@ __pycache__/
 # Uploaded pictures (created at runtime)
 static/uploads/
 
+data/
+runs/
+*.pt
+results*/
+
 # IDEs / editors
 .idea/
 .vscode/

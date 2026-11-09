@@ -2,9 +2,20 @@ async function saveImage() {
 
     try {
 
-        // Ask Flask for the current image
+        // Ask Flask for the image on screen: with cell boxes if a
+        // "Show ... Cells" result (cells_*.jpg) is displayed
+        const shown = (
+            document.getElementById("editorImage").getAttribute("src") || ""
+        ).includes("/uploads/cells_");
+
         const response = await fetch("/save-image", {
-            method: "POST"
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                shown: shown
+            })
         });
 
         // Check if Flask returned an error

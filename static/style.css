@@ -417,6 +417,11 @@ button:active {
     padding: 12px;
 }
 
+.analysis-button:disabled {
+    opacity: 0.5;
+
+    cursor: wait;
+}
 
 .red-button {
     border-left: 3px solid #ef5350;

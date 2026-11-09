@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, url_for
-from cell_detection import detect_cells, draw_cells
+from cell_analysis import analyse, draw
 from processing.zoom import zoom_in
 from processing.image import open_image
 from processing.crop import crop_image
@@ -12,60 +12,45 @@ from processing.shape import (
 )
 import cv2
 import os
+from collections import Counter
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = os.path.join(app.static_folder, "uploads")
-
-# Create the folder if it does not exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 current_image = None
 original_image = None
-
-# Stores all image versions
+shown_image = None  # last "Show ... Cells" image, saved if it's on screen
 image_history = []
-
-# Points to the currently selected image version
 current_index = -1
-
 zoom_level = 100.0
 
-# -------------------------
-# IMAGE HISTORY
-# -------------------------
 
 def add_to_history(image):
     global image_history, current_index, zoom_level
 
-    # Remove redo history
     image_history = image_history[:current_index + 1]
-
-    # Store image and current zoom level
     image_history.append({
         "image": image.copy(),
         "zoom": zoom_level
     })
-
-    # Move to the newest history item
     current_index = len(image_history) - 1
 
     print("History length:", len(image_history))
     print("Current index:", current_index)
     print("Zoom:", zoom_level)
 
-# -------------------------
-# Main page
-# -------------------------
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/open-image", methods=["POST"])
 def open_image_route():
     global current_image, original_image, image_history, current_index, zoom_level
 
-    # Check if an image was uploaded
     if "image" not in request.files:
         return jsonify({
             "success": False,
@@ -74,35 +59,27 @@ def open_image_route():
 
     file = request.files["image"]
 
-    # Open the image using the function from processing/image.py
     image, filename, error = open_image(
         file,
         UPLOAD_FOLDER
     )
 
-    # Check if opening the image failed
     if error is not None:
         return jsonify({
             "success": False,
             "message": error
         })
 
-    # Store the opened image
     current_image = image
     original_image = current_image.copy()
-
-    # New image starts at 100% zoom
     zoom_level = 100.0
 
-    # Start a new image history
     image_history = [{
         "image": image.copy(),
         "zoom": zoom_level
     }]
     current_index = 0
 
-
-    # Send image location back to JavaScript
     return jsonify({
         "success": True,
         "message": "Image opened successfully",
@@ -114,27 +91,31 @@ def open_image_route():
         "zoom": zoom_level
     })
 
+
 @app.route("/save-image", methods=["POST"])
 def save_image():
-
-    # Check if an image is loaded
     if current_image is None:
         return jsonify({
             "success": False,
             "message": "No image loaded"
         })
 
-    # Prepare the current image for saving
-    prepared_image = prepare_image_for_save(current_image)
+    # save what's on screen: cell boxes if shown, else the edited image
+    data = request.get_json(silent=True) or {}
 
-    # Check if the image could be prepared
+    if data.get("shown") and shown_image is not None:
+        image = shown_image
+    else:
+        image = current_image
+
+    prepared_image = prepare_image_for_save(image)
+
     if prepared_image is None:
         return jsonify({
             "success": False,
             "message": "Could not prepare image for saving"
         })
 
-    # Return the image data
     return prepared_image, 200, {
         "Content-Type": "image/jpeg"
     }
@@ -142,8 +123,7 @@ def save_image():
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    global current_image, original_image
-    global image_history, current_index, zoom_level
+    global current_image, original_image, image_history, current_index, zoom_level
 
     if original_image is None:
         return jsonify({
@@ -151,11 +131,9 @@ def reset():
             "message": "No image loaded"
         })
 
-    # Restore the original image
     current_image = original_image.copy()
     zoom_level = 100.0
 
-    # Initialize the history with the original image
     image_history = [{
         "image": current_image.copy(),
         "zoom": zoom_level
@@ -174,12 +152,9 @@ def reset():
         "zoom": zoom_level
     })
 
-# -------------------------
-# TOOLS
-# -------------------------
+
 @app.route("/shape", methods=["POST"])
 def shape():
-
     global current_image
 
     if current_image is None:
@@ -201,8 +176,6 @@ def shape():
         data.get("thickness", 2)
     )
 
-
-    # Rectangle
     if shape_type == "rectangle":
 
         x = int(data["x"])
@@ -220,8 +193,6 @@ def shape():
             thickness
         )
 
-
-    # Circle
     elif shape_type == "circle":
 
         center_x = int(
@@ -245,8 +216,6 @@ def shape():
             thickness
         )
 
-
-    # Arrow
     elif shape_type == "arrow":
 
         x1 = int(data["x1"])
@@ -264,7 +233,6 @@ def shape():
             thickness
         )
 
-
     else:
 
         return jsonify({
@@ -272,19 +240,14 @@ def shape():
             "message": "Unknown shape"
         })
 
-
-    # Add the completed shape
-    # as one history entry
     add_to_history(result)
 
     current_image = result
-
 
     image_url = save_result_image(
         current_image,
         "shape_image.jpg"
     )
-
 
     return jsonify({
         "success": True,
@@ -298,7 +261,7 @@ def shape():
 
 @app.route("/contour", methods=["POST"])
 def contour():
-    # TODO: Add free-hand contour OpenCV logic
+    # todo: free-hand contour
     return jsonify({
         "success": True,
         "message": "Contour tool selected"
@@ -307,7 +270,6 @@ def contour():
 
 @app.route("/crop", methods=["POST"])
 def crop():
-
     global current_image
 
     if current_image is None:
@@ -318,30 +280,32 @@ def crop():
 
     data = request.get_json()
 
-    x = data["x"]
-    y = data["y"]
-    width = data["width"]
-    height = data["height"]
+    # keep the crop inside the image
+    image_height, image_width = current_image.shape[:2]
 
-    print("Crop received:")
-    print("x:", x)
-    print("y:", y)
-    print("width:", width)
-    print("height:", height)
+    x = max(0, int(data["x"]))
+    y = max(0, int(data["y"]))
+    width = min(int(data["width"]), image_width - x)
+    height = min(int(data["height"]), image_height - y)
 
-    # Create the cropped image
+    if width < 2 or height < 2:
+        return jsonify({
+            "success": False,
+            "message": "Crop area is too small"
+        })
+
+    print("Crop received:", x, y, width, height)
+
     cropped_image = crop_image(
         current_image,
         x,
         y,
         width,
         height
-    )
+    ).copy()
 
-    # Add the cropped image to history
     add_to_history(cropped_image)
 
-    # Make the cropped image the current image
     current_image = cropped_image
 
     filename = "cropped_image.jpg"
@@ -360,7 +324,6 @@ def crop():
 
 @app.route("/text", methods=["POST"])
 def text():
-
     global current_image
 
     if current_image is None:
@@ -378,9 +341,8 @@ def text():
     size = float(data["size"])
     color = data["color"]
 
-    # Add text using OpenCV
     text_image = add_text(
-        current_image,
+        current_image.copy(),
         text_value,
         x,
         y,
@@ -388,13 +350,10 @@ def text():
         color
     )
 
-    # Add the new image to history
     add_to_history(text_image)
 
-    # Make the text image the current image
     current_image = text_image
 
-    # Save the result
     image_url = save_result_image(
         current_image,
         "text_image.jpg"
@@ -414,7 +373,6 @@ def save_result_image(image, filename):
 
 @app.route("/zoom-in", methods=["POST"])
 def zoom_in_route():
-
     global current_image, zoom_level
 
     if current_image is None:
@@ -423,7 +381,6 @@ def zoom_in_route():
             "message": "No image loaded"
         })
 
-    # Get click position from JavaScript
     data = request.get_json()
 
     x = int(data["x"])
@@ -431,16 +388,12 @@ def zoom_in_route():
 
     print("Zoom point:", x, y)
 
-    # Perform zoom using the function from zoom.py
     zoomed_image = zoom_in(current_image, x, y)
 
-    # Increase zoom level
-    zoom_level += 20
+    zoom_level *= 2  # zoom_in shows half the width and height
 
-    # Add image and new zoom level to history
     add_to_history(zoomed_image)
 
-    # Make the zoomed image the new current image
     current_image = zoomed_image
 
     image_url = save_result_image(
@@ -456,31 +409,59 @@ def zoom_in_route():
     })
 
 
+@app.route("/zoom-out", methods=["POST"])
+def zoom_out_route():
+    global current_image, zoom_level
 
-# -------------------------
-# UNDO / REDO
-# -------------------------
+    if current_image is None:
+        return jsonify({
+            "success": False,
+            "message": "No image loaded"
+        })
+
+    # step back to the last view before the previous zoom-in
+    for i in range(current_index - 1, -1, -1):
+        if image_history[i]["zoom"] < zoom_level:
+            break
+    else:
+        return jsonify({
+            "success": False,
+            "message": "Already zoomed out"
+        })
+
+    zoom_level = image_history[i]["zoom"]
+    current_image = image_history[i]["image"].copy()
+
+    add_to_history(current_image)
+
+    image_url = save_result_image(
+        current_image,
+        "zoomed_out_image.jpg"
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Zoom out",
+        "image_url": image_url,
+        "zoom": zoom_level
+    })
+
 
 @app.route("/undo", methods=["POST"])
 def undo():
-
     global current_image, current_index, zoom_level
 
-    # Check if we can undo
     if current_index <= 0:
         return jsonify({
             "success": False,
             "message": "Nothing to undo"
         })
 
-    # Move one step back in history
     current_index -= 1
 
-    # Restore the previous image
-    current_image = image_history[current_index]["image"]
+    current_image = image_history[current_index]["image"].copy()
     zoom_level = image_history[current_index]["zoom"]
 
-    # Save the restored image
     image_url = save_result_image(
         current_image,
         "undo_image.jpg"
@@ -491,13 +472,11 @@ def undo():
         "message": "Undo",
         "image_url": image_url,
         "zoom": zoom_level
-
-                   })
+    })
 
 
 @app.route("/redo", methods=["POST"])
 def redo():
-
     global current_image, current_index, zoom_level
     if current_index >= len(image_history) - 1:
         return jsonify({
@@ -507,8 +486,7 @@ def redo():
 
     current_index += 1
 
-    # Restore image and zoom level
-    current_image = image_history[current_index]["image"]
+    current_image = image_history[current_index]["image"].copy()
     zoom_level = image_history[current_index]["zoom"]
 
     image_url = save_result_image(
@@ -523,89 +501,125 @@ def redo():
         "zoom": zoom_level
     })
 
-# -------------------------
-# CELL COUNTING
-# -------------------------
 
-@app.route("/count-red", methods=["POST"])
-def count_red():
+def get_analysis():
+    """Run or reuse the cell analysis of the current image."""
     if current_image is None:
-        return jsonify({"success": False, "count": "--", "message": "No image loaded"})
+        return None, jsonify({
+            "success": False,
+            "count": "--",
+            "message": "No image loaded"
+        })
 
-    rbc_contours, _ = detect_cells(current_image)
+    try:
+        return analyse(current_image), None
+
+    except Exception as error:
+        # e.g. no round red cells so the cell size can't be measured
+        print("Analysis failed:", error)
+        return None, jsonify({
+            "success": False,
+            "count": "--",
+            "message": "Could not analyse this image (cell size not found)"
+        })
+
+
+def count_response(cell_class, label):
+    result, error = get_analysis()
+    if error is not None:
+        return error
+
+    count = result["counts"][cell_class]
 
     return jsonify({
         "success": True,
-        "count": len(rbc_contours),
-        "message": f"Found {len(rbc_contours)} red blood cells"
+        "count": count,
+        "message": f"Found {count} {label}"
     })
+
+
+def type_summary(result):
+    return ", ".join(
+        f"{n} {t}" for t, n in Counter(result["wbc_types"]).most_common()
+    )
+
+
+@app.route("/count-red", methods=["POST"])
+def count_red():
+    return count_response("rbc", "red blood cells")
 
 
 @app.route("/count-white", methods=["POST"])
 def count_white():
-    if current_image is None:
-        return jsonify({"success": False, "count": "--", "message": "No image loaded"})
+    result, error = get_analysis()
+    if error is not None:
+        return error
 
-    _, wbc_contours = detect_cells(current_image)
+    count = result["counts"]["wbc"]
+    types = type_summary(result)
 
     return jsonify({
         "success": True,
-        "count": len(wbc_contours),
-        "message": f"Found {len(wbc_contours)} white blood cells"
+        "count": count,
+        "types": types,
+        "message": f"Found {count} white blood cells" + (f": {types}" if types else "")
     })
 
 
-# -------------------------¢
-# SHOW CELLS
-# -------------------------
+@app.route("/count-all", methods=["POST"])
+def count_all():
+    result, error = get_analysis()
+    if error is not None:
+        return error
+
+    counts = result["counts"]
+
+    return jsonify({
+        "success": True,
+        "counts": counts,
+        "types": type_summary(result),
+        "message": (
+            f"RBC {counts['rbc']}, WBC {counts['wbc']}, "
+            f"platelets {counts['platelet']}, smudge {counts['smudge']}"
+        )
+    })
+
+
+def show_response(classes, filename, message):
+    global shown_image
+
+    result, error = get_analysis()
+    if error is not None:
+        return error
+
+    # not added to history, but kept so Save can store it
+    shown_image = draw(current_image, result, classes)
+    image_url = save_result_image(shown_image, filename)
+
+    return jsonify({
+        "success": True,
+        "message": message,
+        "image_url": image_url
+    })
+
 
 @app.route("/show-red", methods=["POST"])
 def show_red():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=True, show_white=False)
-    image_url = save_result_image(result, "cells_red.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing red blood cells",
-        "image_url": image_url
-    })
+    return show_response(["rbc"], "cells_red.jpg", "Showing red blood cells")
 
 
 @app.route("/show-white", methods=["POST"])
 def show_white():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours, show_red=False, show_white=True)
-    image_url = save_result_image(result, "cells_white.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing white blood cells",
-        "image_url": image_url
-    })
+    # smudge cells shown too, so you can tell them apart
+    return show_response(["wbc", "smudge"], "cells_white.jpg",
+                         "Showing white blood cells (smudge cells in purple)")
 
 
 @app.route("/show-all", methods=["POST"])
 def show_all():
-    if current_image is None:
-        return jsonify({"success": False, "message": "No image loaded"})
-
-    rbc_contours, wbc_contours = detect_cells(current_image)
-    result = draw_cells(current_image, rbc_contours, wbc_contours)
-    image_url = save_result_image(result, "cells_all.jpg")
-
-    return jsonify({
-        "success": True,
-        "message": "Showing all cells",
-        "image_url": image_url
-    })
+    return show_response(["rbc", "wbc", "platelet", "smudge"], "cells_all.jpg",
+                         "Showing all cells")
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=False, port=5001)

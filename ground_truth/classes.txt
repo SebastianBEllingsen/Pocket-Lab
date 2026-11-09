@@ -1,0 +1,4 @@
+platelet
+rbc
+smudge
+wbc

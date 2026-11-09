@@ -4,18 +4,18 @@ import cv2
 def add_text(image, text, x, y, size, color):
 
     font = cv2.FONT_HERSHEY_SIMPLEX
-    thickness = 1
 
-    # Maximum width available for the text
+    # line width grows with the text size
+    thickness = max(1, round(size * 1.5))
+
     max_width = image.shape[1] - x - 10
 
-    # Split text into words
     words = text.split()
 
     lines = []
     current_line = ""
 
-    # Build lines that fit inside the image
+    # wrap to the image width
     for word in words:
 
         test_line = (
@@ -38,12 +38,9 @@ def add_text(image, text, x, y, size, color):
 
             current_line = word
 
-    # Add the last line
     if current_line:
         lines.append(current_line)
 
-
-    # Draw each line
     line_height = int(40 * size)
 
     for i, line in enumerate(lines):
