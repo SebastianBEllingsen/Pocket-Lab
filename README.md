@@ -28,9 +28,9 @@ Then open http://127.0.0.1:5001
 
 1. **Normalise:** find the eyepiece circle and rescale the photo so a red cell has a 16 px radius.
 2. **Count:** the classical counter finds cells with Lab colour, hysteresis thresholding, morphology and the distance transform. An area rule corrects the count for clumps. A cell counts if its centre is inside the counting circle.
-3. **Name white cells:** the first-release YOLO11 model looks at a crop rescaled to look like its PBC training images. A calibration then turns its "erythroblast" answer into "lymphocyte".
+3. **Name white cells (100× only):** each white cell is cropped, its nucleus segmented in Lab colour, and the biggest inside-to-edge distance measured. A thin nucleus (< 0.94 red-cell radii) is called neutrophil, otherwise lymphocyte. At 40× red cells are too small to measure reliably, so the cell is left as "unknown (needs 100×)".
 
-The app therefore uses classical machine vision for counting and a deep-learning model for white-cell types.
+The app uses classical machine vision end to end: no deep-learning model is loaded at runtime. The YOLO11 and YOLO26 methods below are kept for comparison in `evaluate.py`.
 
 ## Methods we compared
 
@@ -57,16 +57,18 @@ White-cell types on 14 test cells at 100×:
 
 | Method | Correct |
 |---|---|
+| Nucleus thickness (current) | 12 / 14 |
 | YOLO11 + calibration | 11 / 14 |
 | Always "lymphocyte" | 7 / 14 |
 | YOLO11, raw | 4 / 14 |
 
-Full tables: [`reports/eval.md`](reports/eval.md).
+Only lymphocyte and neutrophil are predicted; other types cannot be named. Counts are unchanged from the YOLO11 pipeline. Full tables: [`reports/eval.md`](reports/eval.md).
 
 ## Known limits
 
 - Only 16 squares and 14 white cells were tested, and only 4 of the squares are at 100×.
-- The type model only answers lymphocyte or neutrophil, so other types cannot be named.
+- The classifier only answers lymphocyte or neutrophil; other white-cell types cannot be named.
+- White cells in 40× photos are not typed (red cells are too small to measure reliably).
 - White-cell detection was checked only on cells the counter found, so missed cells are not measured.
 - The app keeps the current image in one global variable, so it supports one user at a time.
 
