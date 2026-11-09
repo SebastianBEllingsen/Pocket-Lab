@@ -1,24 +1,4 @@
-"""
-Build a YOLO dataset from raw smear photos using the classical pipeline as an
-automatic labeller ("pseudo-labels"). Correct the labels by hand afterwards
-(CVAT / Label Studio), then train YOLO26 with train_yolo26.py.
-
-What it does per image
-  1. normalise(): find the eyepiece circle and rescale so an RBC has radius 16 px
-     (the same step is used at inference, so YOLO always sees cells at one size)
-  2. run the classical detector -> per-cell boxes for 4 classes
-  3. black out everything outside the counted area (rim cells are never labelled,
-     so they must not be visible either, or YOLO learns to ignore real cells)
-  4. cut 640x640 tiles (stride 512) and write YOLO txt labels
-  5. split train/val/test BY SOURCE IMAGE (never by tile -> no leakage)
-
-Usage
-    python make_yolo_dataset.py raw_images/*.jpg --out dataset --val 0.2 --test 0.1
-Outputs
-    dataset/images/{train,val,test}/*.jpg, dataset/labels/{...}/*.txt,
-    dataset/data.yaml, dataset/review.csv (blobs with more cells than boxes),
-    dataset/preview/*.jpg (labels drawn, for a quick visual check)
-"""
+"""Build a YOLO dataset from raw smears using the classical counter as a pseudo-labeller."""
 import argparse, csv, hashlib, os
 import cv2
 import numpy as np
@@ -30,7 +10,7 @@ TILE, STRIDE = 640, 512
 
 
 def split_of(name, val, test):
-    """Deterministic split from the file name, so re-runs keep images in place."""
+    # deterministic from the name, so re-runs keep images in place
     h = int(hashlib.md5(name.encode()).hexdigest(), 16) % 1000 / 1000
     return "test" if h < test else "val" if h < test + val else "train"
 
@@ -71,19 +51,19 @@ def main():
         if name in a.exclude:
             print(f"{name}: EXCLUDED")
             continue
-        slide = name.split("_")[0]          # S07_100x_f12 -> S07: whole slide in one split
+        slide = name.split("_")[0]  # keep a whole slide in one split
         sp = forced.get(name) or forced.get(slide) or split_of(slide, a.val, a.test)
         try:
             row, nrm, dets, review = process(path, tmp, return_dets=True,
                 has_fov=False if a.no_fov else None,
                 rbc_radius=a.rbc_radius)
-        except ValueError as e:             # normalisation failed: too few round red cells
+        except ValueError as e:
             print(f"{name}: SKIPPED ({e})")
             continue
         img = nrm["img"].copy()
         H, W = img.shape[:2]
         _, inner = count_masks(nrm)
-        img[inner == 0] = 0                                  # hide unlabelled rim (none on plain crops)
+        img[inner == 0] = 0  # hide the unlabelled rim
         for x0, y0, x1, y1, missing in review:
             review_rows.append(dict(image=name, x1=x0, y1=y0, x2=x1, y2=y1,
                                     missing_rbc_boxes=missing, split=sp))
@@ -99,9 +79,9 @@ def main():
         cls = np.array([b[0] for b in dets], int)
         for tx, ty in tiles(W, H):
             tile = img[ty:ty + TILE, tx:tx + TILE]
-            if (tile.max(axis=2) > 0).mean() < 0.25:         # mostly outside FOV
+            if (tile.max(axis=2) > 0).mean() < 0.25:  # mostly outside the field
                 continue
-            if tile.shape[:2] != (TILE, TILE):               # image smaller than a tile: pad
+            if tile.shape[:2] != (TILE, TILE):  # pad small images
                 tile = cv2.copyMakeBorder(tile, 0, TILE - tile.shape[0], 0, TILE - tile.shape[1],
                                           cv2.BORDER_CONSTANT, value=0)
             lines = []
@@ -111,7 +91,7 @@ def main():
                 if cx1 <= cx0 or cy1 <= cy0:
                     continue
                 if (cx1 - cx0) * (cy1 - cy0) < 0.6 * (x1 - x0) * (y1 - y0):
-                    continue                                 # mostly cut off -> skip
+                    continue  # mostly cut off
                 bx, by = (cx0 + cx1) / 2 - tx, (cy0 + cy1) / 2 - ty
                 bw, bh = cx1 - cx0, cy1 - cy0
                 lines.append(f"{c} {bx/TILE:.6f} {by/TILE:.6f} {bw/TILE:.6f} {bh/TILE:.6f}")

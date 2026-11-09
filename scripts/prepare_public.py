@@ -1,13 +1,4 @@
-"""
-Convert public datasets into one YOLO dataset in our class order
-(0 rbc, 1 wbc, 2 platelet, 3 smudge).
-
-    python scripts/prepare_public.py                   # every dataset with a reader
-    python scripts/prepare_public.py --only bbbc041    # one dataset, then re-merge all
-
-Per dataset: data/public/<name>/yolo/{images,labels}/{train,val,test}/ + manifest.csv
-Merged:      data/merged/{images,labels}/..., data.yaml, manifest.csv, previews/
-"""
+"""Convert public datasets into one YOLO dataset in our class order (0 rbc, 1 wbc, 2 platelet, 3 smudge)."""
 import argparse, csv, glob, hashlib, json, os, random, shutil, sys
 from collections import Counter, defaultdict
 
@@ -15,7 +6,7 @@ import cv2
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))                  # project root: count_cells.py
+sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 from public_common import CLASSES, TilePacker, draw_preview, pieces, rbc_radius_from_boxes, rescale  # noqa: E402
 from count_cells import foreground  # noqa: E402
@@ -24,14 +15,12 @@ SPLITS = ("train", "val", "test")
 
 
 def frac(name):
-    """Stable number in [0, 1) from a name, for reproducible splits."""
     return int(hashlib.md5(name.encode()).hexdigest(), 16) % 1000 / 1000
 
 
-# ------------------------------------------------------------------ readers
-# Each reader yields (image name, BGR image, split, [(cls, x1, y1, x2, y2) in raw px]).
+# each reader yields (name, BGR image, split, [(cls, x1, y1, x2, y2) in raw px])
 
-TXL_TO_OURS = {0: 1, 1: 0, 2: 2}                           # TXL: 0 WBC, 1 RBC, 2 Platelets
+TXL_TO_OURS = {0: 1, 1: 0, 2: 2}  # TXL: 0 WBC, 1 RBC, 2 Platelets
 
 
 def read_txl_pbc(raw):
@@ -50,12 +39,11 @@ def read_txl_pbc(raw):
 
 
 BBBC_TO_OURS = {"red blood cell": 0, "ring": 0, "trophozoite": 0, "schizont": 0,
-                "gametocyte": 0, "leukocyte": 1}           # "difficult" is painted out
+                "gametocyte": 0, "leukocyte": 1}  # "difficult" is painted out
 
 
 def paint_out(img, mask):
-    """Fill the masked pixels in from their surroundings (OpenCV inpainting),
-    so hidden cells look like empty glass instead of flat grey rectangles."""
+    """Inpaint the masked pixels so hidden cells look like empty glass."""
     if mask.any():
         img = cv2.inpaint(img, cv2.dilate(mask, np.ones((5, 5), np.uint8)), 5, cv2.INPAINT_TELEA)
     return img
@@ -71,14 +59,14 @@ def read_bbbc041(raw):
             split = official if official == "test" else ("val" if frac(name) < 0.1 else "train")
             boxes, hide = [], np.zeros((h, w), np.uint8)
             for o in entry["objects"]:
-                bb = o["bounding_box"]                      # r = row (y), c = column (x)
+                bb = o["bounding_box"]
                 x1, y1, x2, y2 = bb["minimum"]["c"], bb["minimum"]["r"], bb["maximum"]["c"], bb["maximum"]["r"]
                 if o["category"] == "difficult":
                     cv2.rectangle(hide, (x1, y1), (x2, y2), 255, -1)
                 else:
                     boxes.append((BBBC_TO_OURS[o["category"]], x1, y1, x2, y2))
 
-            # Visible cells without a box: hide them too, so YOLO never sees an unlabelled cell
+            # hide visible cells without a box, so YOLO never sees an unlabelled cell
             r = rbc_radius_from_boxes(boxes, w, h)
             if r:
                 covered = np.zeros((h, w), np.uint8)
@@ -88,7 +76,7 @@ def read_bbbc041(raw):
                 n, lbl, st, _ = cv2.connectedComponentsWithStats(fg)
                 for i in range(1, n):
                     x, y, bw, bh, area = st[i]
-                    if area < 0.5 * np.pi * r * r:          # smaller than half a red cell
+                    if area < 0.5 * np.pi * r * r:  # smaller than half a cell
                         continue
                     comp = lbl[y:y + bh, x:x + bw] == i
                     if (covered[y:y + bh, x:x + bw][comp] > 0).mean() <= 0.3:
@@ -99,18 +87,16 @@ def read_bbbc041(raw):
 
 READERS = {"txl_pbc": read_txl_pbc, "bbbc041": read_bbbc041}
 
-# Blob radius / expert-box radius, measured on train+val images per source and image size.
-# Converts the box radius into the blob radius that normalise() uses for our own photos.
+# blob radius / expert-box radius, measured on train+val per source and size
 BOX_TO_BLOB = {
     ("txl_pbc", "256x256"): 0.95, ("txl_pbc", "360x363"): 0.90,
-    ("txl_pbc", "366x369"): 0.90,       # only 3 round cells measured; same source as 360x363
+    ("txl_pbc", "366x369"): 0.90,  # only 3 round cells measured; same source as 360x363
     ("txl_pbc", "575x575"): 0.88, ("txl_pbc", "640x480"): 0.91,
     ("bbbc041", "1600x1200"): 0.94,
-    ("bbbc041", "1944x1383"): 0.94,     # test-only size: training factor, never measured on test
+    ("bbbc041", "1944x1383"): 0.94,  # test-only size: training factor, never measured on test
 }
 
 
-# ------------------------------------------------------------------ conversion
 def convert(source, reader):
     out = f"{PUBLIC}/{source}/yolo"
     shutil.rmtree(out, ignore_errors=True)
@@ -122,13 +108,13 @@ def convert(source, reader):
     for name, img, split, boxes in reader(f"{PUBLIC}/{source}/raw"):
         h, w = img.shape[:2]
         r = rbc_radius_from_boxes(boxes, w, h)
-        if r is None:                                       # no full RBC box to measure size
+        if r is None:
             skipped += 1
             continue
         size = f"{w}x{h}"
         if (source, size) not in BOX_TO_BLOB:
             missing.add(size)
-        r *= BOX_TO_BLOB.get((source, size), 1.0)           # box radius -> blob radius
+        r *= BOX_TO_BLOB.get((source, size), 1.0)
         radii[size].append(r)
         small, sboxes, s = rescale(img, boxes, r)
         tiles = [packers[split].add(p, b, name) for p, b in pieces(small, sboxes)]
@@ -155,8 +141,7 @@ def convert(source, reader):
 
 
 def merge(repeat):
-    """Rebuild data/merged from every converted dataset in data/public/*/yolo.
-    repeat = {source: n}: copy that source's TRAIN tiles n times in total (never val/test)."""
+    """Rebuild data/merged from every converted dataset."""
     shutil.rmtree(MERGED, ignore_errors=True)
     for sub in ("images", "labels"):
         for sp in SPLITS:

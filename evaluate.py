@@ -1,20 +1,4 @@
-"""
-Compare the classical counter, YOLO26 (Stage A, Stage B) and the first-release pipeline
-(YOLO11 + post-processing, as-is and on PBC-scaled tiles) on our own test photos.
-
-    python evaluate.py
-
-Ground truth (ground_truth/, made by hand, never used for training)
-  crops.csv      random squares per test photo (scripts/make_count_crops.py) with
-                 rbc_hand = red cells counted by eye (centre inside the square)
-  labels/*.txt   Label Studio YOLO export of boxes drawn on the crop images. Where a
-                 crop has boxes, the box count is the reference instead of rbc_hand
-                 (counting by eye missed ~17 % of the small cells at 40x)
-  classes.txt    class names of that export (Label Studio sorts them alphabetically)
-  wbc_types.csv  hand label of every white / smudge cell crop (scripts/make_wbc_crops.py)
-All boxes are converted to normalised image px (RBC radius 16), the space every
-method works in. Writes reports/eval.md, reports/eval.csv, reports/eval_wbc_types.csv.
-"""
+"""Compare the classical counter, YOLO26 and the first-release pipeline on our own test photos."""
 import csv, glob, os, sys
 from collections import Counter
 import numpy as np
@@ -27,23 +11,23 @@ import cv2
 import torch
 from torchvision.ops import nms
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "first_release"))
-import yolo_detection as first_release                  # first-release YOLO11 + post-processing
+import yolo_detection as first_release
 first_release.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "models", "blood_cells.pt")
 
 GT = "ground_truth"
 TEST_DIR = "data/own_v2"
-CLASSES = ["rbc", "wbc", "platelet", "smudge"]           # class ids of the classical counter
-WEIGHTS = {"stageA": "runs/detect/stageA_public/weights/best.pt",   # public data only
-           "stageB": "runs/detect/stageB_own/weights/best.pt"}      # + our photos (main model)
+CLASSES = ["rbc", "wbc", "platelet", "smudge"]
+WEIGHTS = {"stageA": "runs/detect/stageA_public/weights/best.pt",
+           "stageB": "runs/detect/stageB_own/weights/best.pt"}
 TYPES = ["basophil", "eosinophil", "erythroblast", "ig", "lymphocyte", "monocyte",
          "neutrophil"]
-PRED_TYPES = "data/wbc_types/predictions.csv"    # written by scripts/make_wbc_crops.py
-PBC_TILE, PBC_STRIDE, PBC_RBC_RADIUS = 360, 180, 35.4   # first-release input: PBC-sized crops
+PRED_TYPES = "data/wbc_types/predictions.csv"
+PBC_TILE, PBC_STRIDE, PBC_RBC_RADIUS = 360, 180, 35.4
 
 
 def crop_name(path):
-    """'19b73252-unk_40x_09_c2.txt' -> ('unk_40x_09', 2); Label Studio adds an id prefix."""
+    # label studio prefixes an id
     stem = os.path.splitext(os.path.basename(path))[0]
     stem = stem.split("-", 1)[1] if "-" in stem else stem
     image, k = stem.rsplit("_c", 1)
@@ -51,14 +35,11 @@ def crop_name(path):
 
 
 def inside(box, sq):
-    """The counting rule: a box counts for a square if its centre lies inside it."""
     cx, cy = (box[1] + box[3]) / 2, (box[2] + box[4]) / 2
     return sq["x0"] <= cx < sq["x1"] and sq["y0"] <= cy < sq["y1"]
 
 
 def load_ground_truth(gt=GT):
-    """{image: [square, ...]}; each square has its position, the reference RBC count
-    (rbc_ref) and, if it was boxed, the hand-drawn boxes whose centre is inside it."""
     names = [l.strip() for l in open(os.path.join(gt, "classes.txt")) if l.strip()]
     labels = {}
     for f in glob.glob(os.path.join(gt, "labels", "*.txt")):
@@ -66,7 +47,7 @@ def load_ground_truth(gt=GT):
         if key in labels:
             sys.exit(f"two label files for {key}: {labels[key]} and {f}")
         labels[key] = f
-    side = SIZE + 2 * MARGIN                             # crop image side in normalised px
+    side = SIZE + 2 * MARGIN
     out = {}
     for r in csv.DictReader(open(os.path.join(gt, "crops.csv"))):
         image, k = r["image"], int(r["crop"])
@@ -78,11 +59,11 @@ def load_ground_truth(gt=GT):
                 if not line.strip():
                     continue
                 c, cx, cy, w, h = line.split()
-                cx = sq["x0"] - MARGIN + float(cx) * side       # crop -> normalised image px
+                cx = sq["x0"] - MARGIN + float(cx) * side
                 cy = sq["y0"] - MARGIN + float(cy) * side
                 w, h = float(w) * side, float(h) * side
                 b = (names[int(c)], cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
-                if inside(b, sq):                       # margin cells were not all boxed
+                if inside(b, sq):  # margin cells weren't all boxed
                     sq["boxes"].append(b)
         n_box = sum(1 for b in sq["boxes"] if b[0] == "rbc")
         sq["rbc_ref"] = n_box if sq["boxed"] else sq["rbc_hand"]
@@ -101,9 +82,7 @@ def iou(a, b):
 
 
 def match(pred, ref, rule):
-    """Number of one-to-one matches between predicted and reference boxes (x0, y0, x1, y1).
-    'iou': IoU >= 0.5. 'centre': the predicted centre lies inside the reference box (fair
-    when the box size convention differs). Greedy, best pairs first."""
+    """Greedy one-to-one matches. 'iou': IoU >= 0.5. 'centre': pred centre inside ref box."""
     pairs = []
     for i, p in enumerate(pred):
         cx, cy = (p[0] + p[2]) / 2, (p[1] + p[3]) / 2
@@ -125,15 +104,13 @@ def match(pred, ref, rule):
 
 
 def rbc_squares(gt, dets, extra):
-    """One row per (method, square): reference vs predicted RBC count; for hand-boxed
-    squares also the box matches under both rules."""
     rows = []
     for m, per in dets.items():
         for image, sqs in gt.items():
             for sq in sqs:
                 pred = [b[1:] for b in per[image] if b[0] == "rbc" and inside(b, sq)]
                 n = len(pred)
-                if m == "classical":                    # + its area-based clump correction
+                if m == "classical":  # add the area-based clump correction
                     n += sum(k for b, k in extra[image] if inside(b, sq))
                 row = dict(method=m, image=image, crop=sq["crop"], mag=image.split("_")[1],
                            ref=sq["rbc_ref"], pred=n, err=n - sq["rbc_ref"], boxed=sq["boxed"])
@@ -147,9 +124,6 @@ def rbc_squares(gt, dets, extra):
 
 
 def summarise_counts(rows):
-    """Count error per method and magnification. sqrt_ref is the Poisson uncertainty of
-    the reference counts (mean sqrt(N) per square): how precisely a square's count
-    estimates the cell density of the whole slide, not the error between methods."""
     out = []
     for m in dict.fromkeys(r["method"] for r in rows):
         for mag in ("40x", "100x", "all"):
@@ -165,7 +139,6 @@ def summarise_counts(rows):
 
 
 def summarise_boxes(rows):
-    """RBC box precision / recall in the hand-boxed squares, for both matching rules."""
     out = []
     for m in dict.fromkeys(r["method"] for r in rows):
         rs = [r for r in rows if r["method"] == m and r["boxed"]]
@@ -178,8 +151,6 @@ def summarise_boxes(rows):
 
 
 def wbc_type_rows(gt=GT, pred=PRED_TYPES):
-    """One row per white/smudge cell crop: split, what the classical counter called it,
-    the type model's answer and the hand label (ground_truth/wbc_types.csv)."""
     hand = {r["crop"]: r for r in csv.DictReader(open(os.path.join(gt, "wbc_types.csv")))}
     return [dict(crop=p["crop"], split=hand[p["crop"]]["split"], found_as=p["found_as"],
                  predicted=p["predicted"], hand=hand[p["crop"]]["type"])
@@ -187,12 +158,6 @@ def wbc_type_rows(gt=GT, pred=PRED_TYPES):
 
 
 def summarise_types(rows):
-    """(1) what the hand labels say about the cells the counter called wbc / smudge,
-    (2) type accuracy on cells that are a white-cell type by the hand label,
-    (3) confusion counts (hand label, model),
-    (4) a calibration learned on the train + val photos only: each model answer is
-        replaced by the hand label it most often meant there. It is scored on the test
-        photos, next to always answering the most common train + val type."""
     found = {f: Counter(r["hand"] for r in rows if r["found_as"] == f) for f in ("wbc", "smudge")}
     typed = [r for r in rows if r["found_as"] == "wbc" and r["hand"] in TYPES]
     acc = {}
@@ -220,7 +185,6 @@ def write_csv(path, rows):
 
 
 def write_report(check, count_sum, box_sum, type_rows, boxed_sum, out="reports"):
-    """reports/eval.md: all tables of the evaluation, ready to read or copy."""
     found, acc, confusion, cal = summarise_types(type_rows)
     L = ["# Evaluation on our own photos (preliminary)", "",
          "Made by `evaluate.py`. Ground truth: `ground_truth/` (made by hand, never used "
@@ -282,25 +246,19 @@ def write_report(check, count_sum, box_sum, type_rows, boxed_sum, out="reports")
 
 
 def first_release_boxes(raw, nrm, squares):
-    """The first-release pipeline (YOLO11 + post-processing) on one photo, as two
-    methods, boxes in normalised px:
-      first_release_asis  the whole photo, as the first-release app would receive it
-      first_release_pbc   the photo scaled so a red cell has the PBC radius (35.4 px)
-                          and cut into 360 px tiles around each count square: the
-                          image size and cell size the model was trained on"""
-    s = nrm["scale"]                                      # raw px -> normalised px
+    """First-release YOLO11 pipeline, as-is and on PBC-scaled tiles."""
+    s = nrm["scale"]
     kind = lambda t: t if t in ("rbc", "platelet") else "wbc"
     asis = [(kind(c["type"]), *(v * s for v in c["box"]))
             for c in first_release.detect_cells(raw)]
 
-    f = PBC_RBC_RADIUS / nrm["rbc_radius_px"]             # raw px -> PBC px
+    f = PBC_RBC_RADIUS / nrm["rbc_radius_px"]
     pbc = cv2.resize(raw, None, fx=f, fy=f,
                      interpolation=cv2.INTER_AREA if f < 1 else cv2.INTER_LINEAR)
     pad = PBC_TILE
     pbc = cv2.copyMakeBorder(pbc, pad, pad, pad, pad, cv2.BORDER_REPLICATE)
     boxes, scores, types = [], [], []
     for sq in squares:
-        # the square plus one stride of margin, in padded PBC px
         x0, y0 = (int(sq[k] / s * f) + pad - PBC_STRIDE for k in ("x0", "y0"))
         x1, y1 = (int(sq[k] / s * f) + pad + PBC_STRIDE for k in ("x1", "y1"))
         for ty in range(y0, y1 - PBC_TILE + PBC_STRIDE, PBC_STRIDE):
@@ -308,30 +266,25 @@ def first_release_boxes(raw, nrm, squares):
                 for c in first_release.detect_cells(pbc[ty:ty + PBC_TILE, tx:tx + PBC_TILE]):
                     bx0, by0, bx1, by1 = c["box"]
                     if min(bx0, by0) <= 2 or max(bx1, by1) >= PBC_TILE - 2:
-                        continue          # cut by the tile edge; an overlapping tile sees it whole
+                        continue  # cut by the tile edge
                     boxes.append([bx0 + tx, by0 + ty, bx1 + tx, by1 + ty])
-                    scores.append(c["confidence"] + 1e-3)   # post-processing boxes have 0
+                    scores.append(c["confidence"] + 1e-3)
                     types.append(kind(c["type"]))
     if not boxes:
         return asis, []
     keep = nms(torch.tensor(boxes, dtype=torch.float32), torch.tensor(scores), 0.5).tolist()
-    back = s / f                                          # padded PBC px -> normalised px
+    back = s / f
     return asis, [(types[i], *((v - pad) * back for v in boxes[i])) for i in keep]
 
 
 def run_methods(gt, weights=WEIGHTS, conf=0.25, tmp="data/eval_tmp"):
-    """Boxes of every method per test photo, in normalised px:
-    {method: {image: [(class_name, x0, y0, x1, y1), ...]}}. Also returns the classical
-    counter's clumps that hold more cells than boxes: {image: [(box, n_missing), ...]},
-    so its square counts include the area-based clump correction, as its totals do.
-    The two first_release_* methods are explained in first_release_boxes()."""
     os.makedirs(tmp, exist_ok=True)
     models = {m: YOLO(w) for m, w in weights.items()}
     dets = {m: {} for m in ["classical", *models, "first_release_asis", "first_release_pbc"]}
     extra = {}
     for image in sorted(gt):
         path = os.path.join(TEST_DIR, image + ".jpg")
-        # one normalise() per photo, shared by all methods -> identical coordinates
+        # one normalise() per photo, shared across methods
         _, nrm, cdets, review = process(path, tmp, return_dets=True)
         dets["classical"][image] = [(CLASSES[c], x0, y0, x1, y1) for c, x0, y0, x1, y1 in cdets]
         extra[image] = [(("rbc", x0, y0, x1, y1), n) for x0, y0, x1, y1, n in review]
@@ -345,7 +298,7 @@ def run_methods(gt, weights=WEIGHTS, conf=0.25, tmp="data/eval_tmp"):
 
 if __name__ == "__main__":
     gt = load_ground_truth()
-    # agreed rule: the 100x CSV counts are accepted if they differ from the boxes by
+    # agreed rule: accept the 100x hand counts if they differ from the boxes by
     # at most 1.5 cells on average in the boxed 100x squares
     d = [abs(s["rbc_hand"] - s["rbc_ref"]) for i, sqs in gt.items() if "_100x_" in i
          for s in sqs if s["boxed"]]
@@ -356,6 +309,6 @@ if __name__ == "__main__":
     types = wbc_type_rows()
     write_report(check, summarise_counts(rows), summarise_boxes(rows), types,
                  summarise_counts([r for r in rows if r["boxed"]]))
-    write_csv("reports/eval.csv", rows)                 # one row per (method, square)
-    write_csv("reports/eval_wbc_types.csv", types)      # one row per white/smudge crop
+    write_csv("reports/eval.csv", rows)
+    write_csv("reports/eval_wbc_types.csv", types)
     print(open("reports/eval.md").read())

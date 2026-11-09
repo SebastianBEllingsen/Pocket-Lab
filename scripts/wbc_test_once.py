@@ -1,16 +1,9 @@
-"""
-Score the fixed nucleus rule once on the test cells. Run this one time only: the
-threshold was set on train and validation photos and must not change after this.
-
-    python scripts/wbc_test_once.py
-
-Prints only, writes nothing.
-"""
+"""Score the nucleus rule on the test cells. Run once - don't change the threshold after."""
 import csv, os
 import cv2
 from wbc_features import CROPS, LABELS, features, nucleus_mask
 
-THRESHOLD = 0.94            # neutrophil below this nucleus thickness
+THRESHOLD = 0.94  # neutrophil below this
 
 
 def main():

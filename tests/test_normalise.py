@@ -1,13 +1,4 @@
-"""
-normalise() must bring red cells to radius R_CANON (16 px) within 2 px, both for
-an own eyepiece photo and for a plain public crop.
-
-Run from the project root:
-    pytest -q tests/test_normalise.py
-
-Uses the first image in data/own/ and the first image under data/public/*/raw/.
-Override with OWN_PHOTO=path or PUBLIC_CROP=path. A test is skipped if no image is found.
-"""
+"""normalise() must bring red cells to radius R_CANON within 2 px."""
 import glob
 import os
 import sys
@@ -28,7 +19,6 @@ def find_image(env, pattern):
 
 
 def radius_after_normalise(nrm):
-    """Median radius of isolated round cells, measured again on the rescaled image."""
     field, _ = count_masks(nrm)
     mask = cv2.morphologyEx(foreground(nrm["img"], field), cv2.MORPH_OPEN,
                             np.ones((3, 3), np.uint8))

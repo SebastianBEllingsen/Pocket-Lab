@@ -1,11 +1,4 @@
-"""
-Can the shape of the nucleus tell lymphocytes from neutrophils, at 100x and at 40x detail?
-
-    python scripts/wbc_features.py
-
-Reads data/wbc_types/crops and ground_truth/wbc_types.csv. Test photos are skipped.
-Each rule is scored on photos it was not fitted on. Prints only, writes nothing.
-"""
+"""Can the nucleus shape tell lymphocytes from neutrophils at 100x and at 40x?"""
 import csv, os
 import cv2
 import numpy as np
@@ -14,23 +7,22 @@ from skimage.filters import apply_hysteresis_threshold
 
 CROPS = "data/wbc_types/crops"
 LABELS = "ground_truth/wbc_types.csv"
-SIZE = 360                  # side of a crop (px)
-R = 35.4                    # red-cell radius in a crop (px)
+SIZE = 360
+R = 35.4
 A_RBC = np.pi * R ** 2
-R_40X = 11.2                # red-cell radius in our 40x photos (px)
-REACH = 1.6 * R             # nucleus parts must lie this close to the crop centre
+R_40X = 11.2
+REACH = 1.6 * R
 FEATURES = ["area", "solidity", "lobes", "thickness"]
 
 
 def as_40x(crop):
-    """The same crop with the detail of a 40x photo, back at crop size."""
+    """Same crop, downsampled to 40x detail and back."""
     f = R_40X / R
     small = cv2.resize(crop, None, fx=f, fy=f, interpolation=cv2.INTER_AREA)
     return cv2.resize(small, (SIZE, SIZE), interpolation=cv2.INTER_CUBIC)
 
 
 def nucleus_mask(crop):
-    """Purple pixels near the crop centre, with the same stain score as the counter."""
     lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB).astype(np.float32)
     ps = lab[..., 1] - lab[..., 2]
     score = ps - np.median(ps[lab[..., 0] > np.percentile(lab[..., 0], 85)])
@@ -63,7 +55,6 @@ def balanced(y, pred):
 
 
 def best_rule(x, y):
-    """Threshold and direction with the best balanced accuracy."""
     best = (-1.0, 0.0, 1)
     for t in np.unique(x):
         for sign in (1, -1):
@@ -95,7 +86,6 @@ def report(name, rows):
 
 
 def show_values(name, rows):
-    """Thickness of every cell, to place the threshold in the gap between the types."""
     print(f"\n{name}: thickness per type")
     for t in sorted({r["type"] for r in rows}):
         print(f"  {t:<11}", " ".join(f"{r['thickness']:.2f}"

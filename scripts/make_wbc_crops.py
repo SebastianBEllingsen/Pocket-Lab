@@ -1,24 +1,10 @@
-"""
-Cut out every white cell and smudge cell found by the classical counter in our 100x
-photos, exactly as the type model sees it, so the type can be labelled by hand.
-
-    python scripts/make_wbc_crops.py data/own_v2/unk_100x_*.jpg --exclude unk_100x_23 unk_100x_27
-
-The type model never saw our photos, so every photo can be used to measure it; the
-split column still allows reporting train/val and test photos separately. Writes
-  <out>/crops/<photo>_w<k>.jpg   one crop per cell, the cell in the centre
-  <out>/labels.csv               crop, photo, split, type (empty: fill in by hand)
-  <out>/predictions.csv          what the classical counter and the model said:
-                                 do NOT show this file to the person labelling
-Types to write: basophil, eosinophil, erythroblast, ig, lymphocyte, monocyte,
-neutrophil, smudge, not_wbc, unsure
-"""
+"""Cut every white / smudge cell the counter found in our 100x photos, for hand labelling."""
 import argparse, csv, os, sys
 import cv2
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cell_analysis import analyse, pbc_crop
 
-VAL = {"unk_100x_01", "unk_100x_02", "unk_100x_03"}      # split from make_yolo_dataset
+VAL = {"unk_100x_01", "unk_100x_02", "unk_100x_03"}
 
 
 def main():

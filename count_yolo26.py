@@ -19,8 +19,6 @@ def tile_origins(W, H):
     return [(x, y) for y in ys for x in xs]
 
 def stain_maps(img, field):
-    """Same purple-stain measures as count_cells.process(): darkness relative to the
-    glass (dL), dark-nucleus seeds (strong) and the stained-object mask (stain)."""
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     L = lab[..., 0].astype(np.float32)
     ps = lab[..., 1].astype(np.float32) - lab[..., 2].astype(np.float32)
@@ -37,8 +35,7 @@ def stain_maps(img, field):
 
 
 def relabel_smudge(nrm, b, c, names):
-    """Stage A never saw a smudge cell, so it calls them WBC. Check each WBC box with
-    the classical rule: a WBC has a dark nucleus; a large pale purple blob is smudge."""
+    """Stage A never saw a smudge cell, so recheck its WBC boxes with the classical rule."""
     ids = {v: k for k, v in names.items()}
     field, _ = count_masks(nrm)
     dL, strong, stain = stain_maps(nrm["img"], field)
@@ -48,7 +45,7 @@ def relabel_smudge(nrm, b, c, names):
         n, lbl, st, _ = cv2.connectedComponentsWithStats(stain[y0:y1, x0:x1])
         if n < 2:
             continue
-        i = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))      # biggest stained blob in the box
+        i = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))  # biggest blob in the box
         sel, a = lbl == i, st[i, cv2.CC_STAT_AREA]
         is_wbc = (a >= 0.8 * A_RBC and strong[y0:y1, x0:x1][sel].any()
                   and dL[y0:y1, x0:x1][sel].mean() < -78)
@@ -57,8 +54,7 @@ def relabel_smudge(nrm, b, c, names):
     return c
 
 def detect(model, nrm, conf, smudge_check=True):
-    """Tiled YOLO26 inference on a normalised image. Returns boxes (N x 4, normalised px)
-    and class ids of the cells whose centre lies inside the counted area."""
+    """Tiled YOLO26 inference on a normalised image."""
     img = nrm["img"].copy()
     H, W = img.shape[:2]
     _, inner = count_masks(nrm)
@@ -72,8 +68,7 @@ def detect(model, nrm, conf, smudge_check=True):
                                 max_det=1000, verbose=False)
         for (x, y), r in zip(origins[i:i + 8], results):
             b = r.boxes.xyxy.cpu().numpy()
-            # A box touching an inner tile edge is a cut-off cell: the neighbouring tile
-            # overlaps by 128 px (more than any cell) and sees the whole cell, so drop it.
+            # drop cells cut by an inner tile edge; the neighbouring tile sees them whole
             cut = (((b[:, 0] <= 2) & (x > 0)) | ((b[:, 1] <= 2) & (y > 0)) |
                    ((b[:, 2] >= TILE - 2) & (x + TILE < W)) | ((b[:, 3] >= TILE - 2) & (y + TILE < H)))
             boxes.append(b[~cut] + [x, y, x, y])
@@ -87,7 +82,7 @@ def detect(model, nrm, conf, smudge_check=True):
         b, c = b.numpy()[keep], c.numpy()[keep]
     else:
         b, c = np.zeros((0, 4)), np.zeros(0, int)
-    # count a box only if its centre lies inside the counted area
+    # a box counts only if its centre is inside the counted area
     cxs = ((b[:, 0] + b[:, 2]) / 2).astype(int).clip(0, W - 1)
     cys = ((b[:, 1] + b[:, 3]) / 2).astype(int).clip(0, H - 1)
     ok = inner[cys, cxs] > 0

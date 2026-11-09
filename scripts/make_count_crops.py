@@ -1,33 +1,21 @@
-"""
-Pick random squares in the test photos for hand-counting red cells.
-
-    python scripts/make_count_crops.py data/own_v2/unk_40x_08.jpg ... --out data/own_gt
-
-For every photo, N squares (default 4) are drawn at random (fixed seed) inside the
-counted area. The square size is fixed in normalised px (RBC radius 16), so a square
-holds about the same number of cells at 40x and 100x (~30-40). Writes
-  <out>/crops/<photo>_c<k>.jpg   the square cut from the raw photo, enlarged, with context
-  <out>/crops.csv                square positions + an empty rbc_hand column to fill in
-Counting rule: count a red cell when its CENTRE lies inside the black square.
-"""
+"""Pick random squares in the test photos for hand-counting red cells."""
 import argparse, csv, os, sys, zlib
 import cv2
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from count_cells import normalise, count_masks
 
-SIZE = 240            # square side in normalised px (about 6 RBC diameters)
-MARGIN = 48         # context shown around the square, normalised px
-SHOW = 900          # side of the saved image in px
+SIZE = 240  # square side in normalised px (~6 cell diameters)
+MARGIN = 48
+SHOW = 900
 
 
 def pick_squares(inner, n, rng, tries=20000):
-    """n non-overlapping squares, all completely inside the counted area. Whole sets are
-    drawn at random until one fits, so no position is favoured by the drawing order."""
-    ii = cv2.integral((inner > 0).astype(np.uint8))     # sum of any rectangle in O(1)
+    """n non-overlapping squares, all inside the counted area."""
+    ii = cv2.integral((inner > 0).astype(np.uint8))
     full = (ii[SIZE:, SIZE:] - ii[:-SIZE, SIZE:] - ii[SIZE:, :-SIZE]
             + ii[:-SIZE, :-SIZE]) == SIZE * SIZE
-    ys, xs = np.nonzero(full)                           # every top-left corner that fits
+    ys, xs = np.nonzero(full)
     if len(xs) < n:
         return []
     for _ in range(tries):
@@ -51,7 +39,7 @@ def main():
         sys.exit(f"{csv_path} already exists and may hold your counts - move it away first")
     os.makedirs(os.path.join(a.out, "crops"), exist_ok=True)
 
-    m = SHOW * MARGIN // (SIZE + 2 * MARGIN)            # square edge in the saved image
+    m = SHOW * MARGIN // (SIZE + 2 * MARGIN)
     rows = []
     for path in a.images:
         name = os.path.splitext(os.path.basename(path))[0]
@@ -63,14 +51,14 @@ def main():
         if len(squares) < a.n:
             print(f"{name}: only {len(squares)} squares fit")
         s = nrm["scale"]
-        side = int(round((SIZE + 2 * MARGIN) / s))         # crop side in raw px
+        side = int(round((SIZE + 2 * MARGIN) / s))
         big = cv2.copyMakeBorder(raw, side, side, side, side, cv2.BORDER_CONSTANT)
         for k, (x, y) in enumerate(squares, 1):
-            # cut from the raw photo (more detail than the normalised one)
+            # cut from the raw photo for more detail
             rx, ry = int(round((x - MARGIN) / s)) + side, int(round((y - MARGIN) / s)) + side
             crop = cv2.resize(big[ry:ry + side, rx:rx + side], (SHOW, SHOW),
                               interpolation=cv2.INTER_CUBIC)
-            for t in range(1, 4):                           # 4x4 helper grid
+            for t in range(1, 4):  # 4x4 helper grid
                 g = m + (SHOW - 2 * m) * t // 4
                 cv2.line(crop, (g, m), (g, SHOW - m), (190, 190, 190), 1)
                 cv2.line(crop, (m, g), (SHOW - m, g), (190, 190, 190), 1)

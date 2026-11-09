@@ -1,11 +1,4 @@
-"""
-Shared helpers for converting public datasets into our YOLO format.
-
-Every image is rescaled so a red blood cell has radius R_CANON (16 px), like our
-own photos. For labelled datasets the RBC radius comes from the expert RBC boxes,
-which works even in images with too few isolated round cells for normalise().
-Rescaled images are packed side by side onto 640 x 640 tiles.
-"""
+"""Shared helpers for converting public datasets into our YOLO format."""
 import os
 
 import cv2
@@ -16,19 +9,18 @@ from count_cells import R_CANON
 CLASSES = ["rbc", "wbc", "platelet", "smudge"]
 COLORS = [(0, 200, 0), (255, 60, 0), (0, 140, 255), (200, 0, 200)]
 TILE, STRIDE = 640, 512
-GAP = 4                  # px of black between packed images
+GAP = 4
 MAX_UPSCALE = 4.0
 
 
 def rbc_radius_from_boxes(boxes, w, h):
-    """Median RBC radius in raw px from (cls, x1, y1, x2, y2) boxes not cut by the image edge."""
+    """Median RBC radius in raw px from boxes not cut by the image edge."""
     r = [((x2 - x1) + (y2 - y1)) / 4 for c, x1, y1, x2, y2 in boxes
          if c == 0 and x1 > 1 and y1 > 1 and x2 < w - 2 and y2 < h - 2]
     return float(np.median(r)) if r else None
 
 
 def rescale(img, boxes, rbc_radius):
-    """Rescale image and boxes so the RBC radius becomes R_CANON (never upscale more than 4x)."""
     s = min(R_CANON / rbc_radius, MAX_UPSCALE)
     out = cv2.resize(img, None, fx=s, fy=s,
                      interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
@@ -36,8 +28,7 @@ def rescale(img, boxes, rbc_radius):
 
 
 def pieces(img, boxes):
-    """Cut an image larger than a tile into TILE x TILE pieces (stride 512), keeping
-    boxes that are at least 60 % inside a piece. Small images stay whole."""
+    """Cut large images into 640x640 pieces (stride 512). Small images stay whole."""
     h, w = img.shape[:2]
     if h <= TILE and w <= TILE:
         return [(img, boxes)]
@@ -59,8 +50,7 @@ def pieces(img, boxes):
 
 
 class TilePacker:
-    """Places images side by side (row by row) on black TILE x TILE tiles and
-    writes every full tile with its YOLO labels."""
+    """Places images side by side on black 640x640 tiles and writes each full tile."""
 
     def __init__(self, out_dir, split, prefix):
         self.out, self.split, self.prefix, self.n = out_dir, split, prefix, 0
@@ -75,11 +65,10 @@ class TilePacker:
         return f"{self.prefix}_{self.split}_{self.n:05d}"
 
     def add(self, img, boxes, member):
-        """Add one image (at most TILE x TILE); returns the name of the tile it lands on."""
         h, w = img.shape[:2]
-        if self.x + w > TILE:                               # start a new row
+        if self.x + w > TILE:  # next row
             self.x, self.y, self.row_h = 0, self.y + self.row_h + GAP, 0
-        if self.y + h > TILE:                               # tile full
+        if self.y + h > TILE:  # tile full
             self.flush()
         self.canvas[self.y:self.y + h, self.x:self.x + w] = img
         for c, x1, y1, x2, y2 in boxes:
@@ -107,7 +96,6 @@ class TilePacker:
 
 
 def draw_preview(img_path, label_path, out_path):
-    """Draw the YOLO labels of one tile, for a visual check."""
     img = cv2.imread(img_path)
     for line in open(label_path).read().splitlines():
         if line.strip():
