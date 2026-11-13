@@ -137,7 +137,10 @@ def _load_rbc_masks(root: Path) -> list[Sample]:
 
 @register_dataset("bccd", "2")
 def _load_bccd(root: Path) -> list[Sample]:
-    base = root / "Data_Set_2" / "bccd-shenggan"
+    # two known layouts: a fresh clone of the BCCD repo, or the older nested zip extract
+    candidates = [root / "Data_Set_2" / "bccd-shenggan",
+                  root / "Data_Set_2" / "dataset-master" / "dataset-master"]
+    base = next((p for p in candidates if p.is_dir()), candidates[0])
     out = []
     for img in (base / "JPEGImages").glob("*.jpg"):
         xml = base / "Annotations" / f"{img.stem}.xml"
